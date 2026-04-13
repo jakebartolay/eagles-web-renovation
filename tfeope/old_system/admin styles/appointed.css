@@ -1,0 +1,425 @@
+/* ================== APPOINTED OFFICERS (MODERN, SAME HTML) ================== */
+:root{
+  --bg:#f4f6fa;
+  --panel: rgba(255,255,255,.92);
+  --panelSolid:#ffffff;
+
+  --text:#0b1220;
+  --muted: rgba(11,18,32,.62);
+
+  --navy:#0f2d55;
+  --navy2:#162447;
+
+  --line: rgba(15,23,42,.10);
+  --line2: rgba(15,23,42,.07);
+
+  --shadow: 0 18px 55px rgba(15,23,42,.10);
+  --shadowSm: 0 10px 24px rgba(15,23,42,.10);
+
+  --radius: 16px;
+  --radius2: 22px;
+
+  --danger:#c5303f;
+  --dangerBg: rgba(197,48,63,.10);
+  --dangerBd: rgba(197,48,63,.22);
+}
+
+*{ box-sizing:border-box; }
+html, body{ height:100%; }
+
+body{
+  margin:0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(1000px 520px at 22% 0%, rgba(15,45,85,.10), transparent 60%),
+    radial-gradient(900px 460px at 86% 12%, rgba(255,204,0,.10), transparent 55%),
+    var(--bg);
+  overflow-x:hidden;
+}
+
+/* ================== MAIN CONTENT ================== */
+.main-content{
+  margin-left: 260px;
+  padding: 28px 26px 60px;
+  min-height: 100vh;
+  transition: margin-left .25s ease, padding .25s ease;
+  max-width: 100%;
+}
+
+h1{
+  margin: 0 0 16px;
+  font-family: Merriweather, serif;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: .2px;
+  color: var(--navy);
+}
+
+/* helpful wrapper if you have title + button in one row (doesn't require HTML changes if not used) */
+.page-actions{
+  display:flex;
+  align-items:center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ================== ADD BUTTON ================== */
+.add-btn{
+  display:inline-flex;
+  align-items:center;
+  gap: 10px;
+
+  background: linear-gradient(180deg, rgba(15,45,85,.95), rgba(11,31,58,.95));
+  color:#fff;
+
+  padding: 12px 16px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 14px;
+
+  cursor:pointer;
+  font-weight: 900;
+  font-size: 13.5px;
+
+  box-shadow: 0 14px 30px rgba(15,23,42,.14);
+  transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+}
+
+.add-btn:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+  box-shadow: 0 18px 40px rgba(15,23,42,.18);
+}
+
+.add-btn:active{ transform: translateY(0); }
+
+/* ================== TABLE ================== */
+table{
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+
+  margin-top: 16px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius2);
+  overflow: hidden;
+
+  box-shadow: var(--shadow);
+}
+
+/* ---- responsive table: allow scrolling without breaking border radius ---- */
+.table-wrap{
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: var(--radius2);
+}
+.table-wrap table{ min-width: 900px; } /* keeps columns readable; scrolls on small screens */
+
+/* if you don't have .table-wrap in HTML, still make table scrollable safely */
+@supports (overflow: clip){
+  /* no-op, just keeps this section valid */
+}
+
+thead th{
+  background: linear-gradient(180deg, rgba(15,45,85,.97), rgba(10,30,60,.97));
+  color:#fff;
+  text-align:left;
+
+  padding: 14px 16px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .2px;
+
+  border-bottom: 1px solid rgba(255,255,255,.10);
+  white-space: nowrap;
+}
+
+tbody td{
+  padding: 14px 16px;
+  border-top: 1px solid var(--line2);
+  vertical-align: middle;
+  font-size: 13.5px;
+  color: rgba(11,18,32,.88);
+}
+
+tbody tr:nth-child(even){
+  background: rgba(245,248,252,.72);
+}
+
+tbody tr:hover{
+  background: rgba(15,45,85,.06);
+}
+
+/* Make long committee readable but not explode layout */
+tbody td:nth-child(4){
+  color: rgba(11,18,32,.72);
+  line-height: 1.35;
+  max-width: 520px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Name emphasis like your screenshot */
+.name-cell{
+  font-weight: 900;
+  color: rgba(11,18,32,.92);
+}
+
+/* keep actions compact */
+td.actions-cell{
+  white-space: nowrap;
+}
+
+/* ================== ACTION BUTTONS ================== */
+.edit-btn,
+.delete-btn{
+  width: 40px;
+  height: 36px;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  border-radius: 10px;
+  border: 1px solid rgba(15,23,42,.12);
+
+  cursor:pointer;
+  text-decoration:none;
+
+  transition: transform .14s ease, filter .14s ease, box-shadow .14s ease, border-color .14s ease;
+}
+
+.edit-btn{
+  background: rgba(15,45,85,.10);
+  border-color: rgba(15,45,85,.18);
+  color: rgba(15,45,85,.95);
+}
+
+.delete-btn{
+  background: var(--dangerBg);
+  border-color: var(--dangerBd);
+  color: var(--danger);
+}
+
+.edit-btn:hover,
+.delete-btn:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+  border-color: rgba(15,23,42,.18);
+  box-shadow: 0 12px 22px rgba(15,23,42,.12);
+}
+
+.edit-btn i,
+.delete-btn i{ pointer-events:none; font-size: 14px; }
+
+/* ================== MODALS (FIXED + GLASS) ==================
+   Your PHP has inline <style> for .modal/.modal-content.
+   This overrides it cleanly without touching your HTML.
+*/
+.modal{
+  display:none;
+  position:fixed;
+  inset:0;
+  z-index: 2000;
+
+  background: rgba(2,6,23,.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  padding: 18px;
+  opacity: 0;
+  transition: opacity .18s ease;
+}
+
+.modal.show{
+  display:flex !important;
+  align-items:center;
+  justify-content:center;
+  opacity: 1;
+}
+
+/* responsive modal sizing */
+.modal-content{
+  width: min(560px, calc(100% - 24px)) !important;
+  margin: 0 !important;
+
+  background: rgba(255,255,255,.96);
+  border: 1px solid rgba(255,255,255,.65);
+  border-radius: 22px;
+
+  box-shadow: 0 28px 90px rgba(0,0,0,.35);
+  padding: 18px;
+
+  max-height: min(90vh, 720px);
+  overflow:auto;
+
+  transform: translateY(14px);
+  opacity: 0;
+  transition: transform .18s ease, opacity .18s ease;
+
+  position: relative; /* for absolute close btn */
+}
+
+.modal.show .modal-content{
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Modal header look */
+.modal-content h2{
+  margin: 4px 0 12px;
+  font-family: Merriweather, serif;
+  font-size: 20px;
+  color: var(--navy);
+}
+
+/* Close button */
+.close-btn{
+  float:none !important;
+  position:absolute;
+  right: 14px;
+  top: 12px;
+
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+
+  display:grid;
+  place-items:center;
+
+  background: rgba(15,23,42,.06);
+  border: 1px solid rgba(15,23,42,.10);
+
+  cursor:pointer;
+  font-size: 20px;
+  line-height: 1;
+  color: rgba(11,18,32,.70);
+
+  transition: transform .14s ease, filter .14s ease;
+}
+
+.close-btn:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+/* Form controls */
+.modal form{
+  display:flex;
+  flex-direction:column;
+  gap: 10px;
+}
+
+.modal form input,
+.modal form select,
+.modal form input[type="file"]{
+  width: 100% !important;
+  padding: 12px 12px;
+
+  border-radius: 14px;
+  border: 1px solid rgba(15,23,42,.12);
+
+  background: rgba(255,255,255,.98);
+  font-size: 13.5px;
+  color: rgba(11,18,32,.92);
+
+  outline:none;
+  transition: border-color .14s ease, box-shadow .14s ease;
+}
+
+.modal form input:focus,
+.modal form select:focus{
+  border-color: rgba(15,45,85,.30);
+  box-shadow: 0 0 0 5px rgba(15,45,85,.10);
+}
+
+.modal form button{
+  width: 100%;
+  padding: 12px 14px;
+
+  border:none;
+  border-radius: 14px;
+
+  background: linear-gradient(180deg, #ffd84df5, rgba(255,204,0,.96));
+  color: rgba(17,17,17,.92);
+
+  font-weight: 900;
+  font-size: 13.5px;
+
+  cursor:pointer;
+  box-shadow: 0 14px 26px rgba(0,0,0,.12);
+
+  transition: transform .16s ease, filter .16s ease;
+}
+
+.modal form button:hover{
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+/* ================== RESPONSIVE ================== */
+
+/* Large tablets / small laptops */
+@media (max-width: 1024px){
+  .main-content{
+    margin-left: 220px; /* sidebar a bit narrower */
+    padding: 24px 20px 40px;
+  }
+  h1{ font-size: 28px; }
+
+  /* let long content breathe */
+  tbody td:nth-child(4){ max-width: 440px; }
+}
+
+/* Tablets / phones */
+@media (max-width: 768px){
+  /* if your header is fixed at ~70px, keep this */
+  .main-content{
+    margin-left: 0;
+    padding: 70px 14px 24px;
+  }
+
+  h1{ font-size: 24px; }
+
+  .add-btn{
+    width: 100%;
+    justify-content:center;
+  }
+
+  /* Make table reliably scroll on small screens WITHOUT breaking layout */
+  table{
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius2);
+  }
+  thead, tbody, tr{ width: 100%; }
+  th, td{ white-space: nowrap; }
+  tbody td:nth-child(4){
+    white-space: normal;
+    min-width: 280px;
+    max-width: 360px;
+  }
+
+  /* slightly smaller action buttons on phones */
+  .edit-btn, .delete-btn{
+    width: 38px;
+    height: 34px;
+  }
+}
+
+/* Small phones */
+@media (max-width: 420px){
+  .main-content{ padding: 70px 12px 18px; }
+  h1{ font-size: 22px; }
+
+  thead th{ padding: 12px 12px; font-size: 13px; }
+  tbody td{ padding: 12px 12px; font-size: 13px; }
+
+  .modal{ padding: 12px; }
+  .modal-content{ padding: 14px; border-radius: 18px; }
+  .close-btn{ right: 10px; top: 10px; width: 36px; height: 36px; }
+}

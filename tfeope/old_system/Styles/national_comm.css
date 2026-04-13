@@ -1,0 +1,278 @@
+/* ✅ NATIONAL_COMM.CSS (ONLY 5 cards in OTHERS: 3 on row 1, 2 centered on row 2; same size & aligned) */
+
+body {
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  padding-top: 70px;
+  background: #f8f9fb;
+  color: #222;
+}
+
+/* HERO */
+.officers-hero {
+  background: linear-gradient(rgba(0,0,0,.4), rgba(0,0,0,.4)),
+              url('../static/officer.jpg') center 30% / cover no-repeat;
+  padding: 120px 20px;
+  text-align: center;
+  color: #fff;
+}
+
+.officers-hero h1 {
+  font-family: 'Merriweather', serif;
+  font-size: 56px;
+  font-weight: 900;
+}
+
+/* ORG CHART */
+.org-chart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 80px;
+  padding: 50px 20px;
+}
+
+/* GRID PER LEVEL */
+.chart-level {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  justify-content: center;
+  justify-items: center;
+  gap: 60px;
+}
+
+/* PRESIDENT */
+.chart-level.president {
+  grid-template-columns: 260px;
+}
+
+/* ✅ OTHERS: base 3 columns */
+.chart-level.others {
+  grid-template-columns: repeat(3, 260px);
+  grid-auto-rows: auto;
+  justify-content: center;
+  justify-items: center;
+  gap: 60px;
+
+  /* lock grid width so the whole block is centered consistently */
+  width: calc((260px * 3) + (60px * 2));
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ✅ 5 cards layout: 3 on row 1, then 2 centered on row 2 (use col 1 & 3) */
+.chart-level.others > .officer-card:nth-child(4) { grid-column: 1; grid-row: 2; }
+.chart-level.others > .officer-card:nth-child(5) { grid-column: 3; grid-row: 2; }
+
+/* Eagle inline */
+.officer-eagle {
+  font-family: "Brush Script MT", "Segoe Script", cursive;
+  font-size: 16px;
+  font-weight: 400;
+  color: #1f4068;
+  display: inline;
+  margin-right: 6px;
+  line-height: 1;
+  vertical-align: baseline;
+}
+
+/* ✅ CARD — SAME SIZE + ALIGNED */
+.officer-card {
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+
+  width: 260px;
+  min-height: 330px;
+  padding: 20px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+
+  text-align: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+  cursor: pointer;
+  transition: box-shadow 0.2s ease;
+}
+
+.officer-card:hover {
+  box-shadow: 0 16px 36px rgba(0,0,0,0.2);
+}
+
+/* ✅ IMAGE — SAME SIZE */
+.officer-card img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 15px;
+  flex-shrink: 0;
+}
+
+.officer-info {
+  width: 100%;
+}
+
+.officer-card h4 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.officer-card p {
+  margin: 6px 0 0;
+  line-height: 1.2;
+}
+
+.officer-card .role {
+  font-size: 16px;
+  color: #1f4068;
+  margin-bottom: 10px;
+}
+
+/* DETAIL PANEL */
+.detail-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.85);
+  width: 360px;
+  max-width: 95%;
+  background: #fff;
+  border-radius: 12px;
+  padding: 30px 25px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.35);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 1000;
+  transition: all 0.3s ease-out;
+}
+
+.detail-panel.show {
+  pointer-events: auto;
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.detail-panel img {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  border-radius: 12px;
+  margin-bottom: 15px;
+}
+
+.detail-panel h3 {
+  margin: 10px 0 5px 0;
+  font-size: 22px;
+}
+
+.detail-panel .role {
+  font-weight: 700;
+  color: #1f4068;
+  margin-bottom: 10px;
+  font-size: 16px;
+}
+
+.detail-panel .speech {
+  font-style: italic;
+  color: #555;
+  font-size: 15px;
+}
+
+.detail-panel .close {
+  position: absolute;
+  top: 12px;
+  right: 18px;
+  font-size: 28px;
+  color: #ff4d4f;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.detail-panel .close:hover {
+  transform: scale(1.3);
+}
+
+/* MODAL OVERLAY */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0,0,0,0);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 900;
+  transition: opacity 0.25s ease;
+}
+
+.modal-overlay.show {
+  pointer-events: auto;
+  opacity: 1;
+  background: rgba(0,0,0,0.5);
+}
+
+/* RESPONSIVE */
+@media (max-width: 1024px){
+  .chart-level { max-width: 900px; gap: 45px; }
+  .chart-level.president { grid-template-columns: 220px; }
+
+  .chart-level.others {
+    grid-template-columns: repeat(3, 220px);
+    width: auto;
+  }
+
+  /* reset manual placement */
+  .chart-level.others > .officer-card {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+
+  .officer-card { width: 220px; min-height: 310px; }
+  .detail-panel { width: 300px; }
+}
+
+@media (max-width: 768px){
+  .chart-level { gap: 30px; }
+  .chart-level.president { grid-template-columns: 180px; }
+
+  .chart-level.others {
+    grid-template-columns: repeat(2, 180px);
+    width: auto;
+  }
+
+  /* reset manual placement */
+  .chart-level.others > .officer-card {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+
+  .officer-card { width: 180px; min-height: 280px; }
+  .officer-card img { height: 150px; }
+  .detail-panel { width: 260px; }
+}
+
+@media (max-width: 480px){
+  .chart-level { gap: 20px; }
+  .chart-level.president { grid-template-columns: 150px; }
+
+  .chart-level.others {
+    grid-template-columns: 150px;
+    width: auto;
+  }
+
+  /* reset manual placement */
+  .chart-level.others > .officer-card {
+    grid-column: auto !important;
+    grid-row: auto !important;
+  }
+
+  .officer-card { width: 150px; min-height: 250px; }
+  .officer-card img { height: 120px; }
+  .detail-panel { width: 220px; padding: 20px; }
+}
