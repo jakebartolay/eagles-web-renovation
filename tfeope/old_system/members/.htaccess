@@ -1,0 +1,2 @@
+RewriteEngine On
+RewriteRule ^member_search$ member_search.php [L,QSA]

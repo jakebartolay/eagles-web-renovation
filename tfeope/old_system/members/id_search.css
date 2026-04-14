@@ -1,0 +1,333 @@
+/* =============================
+   RESET + NO BACKGROUND SCROLL
+   ============================= */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;            /* LOCK background scroll */
+}
+
+:root{
+  --modal-max: 520px;
+  --radius: 22px;
+  --shadow: 0 30px 100px rgba(0,0,0,.45);
+  --text: #111;
+  --muted: #555;
+}
+
+/* Red circle + pulse for error */
+.verify-status.error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.status-circle.error {
+  width: 14px;
+  height: 14px;
+  background: #dc3545; /* red */
+  border-radius: 50%;
+  position: relative;
+}
+
+.status-circle.error::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(220, 53, 69, 0.4); /* red, semi-transparent */
+  animation: pulse 1.5s infinite;
+}
+
+
+/* Green circle + pulse */
+.verify-status {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* horizontally center inside flex parent */
+  gap: 12px;
+  text-align: center;
+  margin-bottom: 8px;      /* optional spacing from modal text */
+}
+
+.status-circle {
+  width: 14px;
+  height: 14px;
+  background: #28a745; /* green */
+  border-radius: 50%;
+  position: relative;
+}
+
+/* Pulse animation */
+.status-circle::after {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: -6px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(40, 167, 69, 0.4);
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.8); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 0.2; }
+  100% { transform: scale(0.8); opacity: 0.6; }
+}
+
+/* =============================
+   BODY BACKGROUND BLUR-UP
+============================= */
+body {
+  background: url("VIP2.png") center / cover no-repeat fixed;
+  position: relative;
+  font-family: Inter, system-ui, Arial, sans-serif;
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* Blurred background placeholder */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1; /* behind content */
+  background: url("VIP2.png") center / cover no-repeat fixed;
+  
+  /* start blurred and dimmed */
+  filter: blur(20px) brightness(0.7);
+  transition: filter 0.8s ease, opacity 0.8s ease;
+  opacity: 0.6;
+}
+
+/* Remove blur when loaded */
+body.bg-loaded::before {
+  filter: blur(0) brightness(1);
+  opacity: 1;
+}
+
+/* =============================
+   MODAL CENTERING + GLASS EFFECT
+   ============================= */
+.verify-modal {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 3vw, 28px);
+  z-index: 9999;
+}
+
+.verify-modal-card {
+  width: min(var(--modal-max), 100%);
+  
+  /* Glass / frosted effect */
+  background: rgba(255, 255, 255, 0.25);   /* semi-transparent white */
+  backdrop-filter: blur(12px);             /* frosted blur */
+  -webkit-backdrop-filter: blur(12px);     /* Safari support */
+  
+  border-radius: var(--radius);
+  padding: clamp(16px, 3.5vw, 26px);
+  text-align: center;
+  box-shadow: var(--shadow);
+  position: relative;
+
+  max-height: 90vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* Close button */
+.verify-close{
+  position: absolute;
+  top: 12px;
+  right: 12px;
+
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,.10);
+  background: #f2f2f2;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+
+  display: grid;
+  place-items: center;
+  z-index: 2;
+}
+
+
+.verify-close:active { transform: scale(.98); }
+
+.verify-close:hover {
+    background: #e0e0e0;           /* darker than default */
+    border-color: rgba(0,0,0,.2);  /* highlight border */
+    transform: scale(1.1);          /* slight enlarge */
+    transition: all 0.2s ease;      /* smooth animation */
+}
+
+/* =============================
+   MODAL TEXT (RESPONSIVE)
+   ============================= */
+.verify-modal-title{
+  color: white;
+  font-size: clamp(18px, 3.8vw, 24px);
+  font-weight: 900;
+  margin: 0 0 8px;   /* remove top space */
+  padding-top: 6px;  /* tiny breathing room (optional) */
+}
+
+.verify-modal-sub {
+  font-size: clamp(13px, 2.8vw, 15px);
+  color: white;   /* green */
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
+
+/* =============================
+   ID CARD (FULLY RESPONSIVE)
+   ============================= */
+.id-card{
+  position: relative;
+  width: min(360px, 100%);
+  aspect-ratio: 360 / 228;
+  margin: 12px auto 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 14px 28px rgba(0,0,0,.20);
+ /* background: rgba(255, 255, 255, 0.25);  semi-transparent */
+  backdrop-filter: blur(12px);           /* blur effect */
+  -webkit-backdrop-filter: blur(12px);   /* Safari */
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.18);
+}
+
+.id-bg{
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Percent-based layout (scales perfectly) */
+.id-number{
+  position:absolute;
+  top: 29.8%;
+  left: 10%;
+  font-size: clamp(6px, 1.6vw, 7px);
+  font-weight: 900;
+  letter-spacing: .6px;
+}
+
+.id-last{
+  position:absolute;
+  top: 33.3%;
+  left: 41.7%;
+  font-size: clamp(12px, 3.4vw, 16px);
+  font-weight: 900;
+  white-space: nowrap;
+  max-width: 54%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.id-first{
+  position:absolute;
+  top: 43.9%;
+  left: 33.3%;
+  font-size: clamp(11px, 3.2vw, 15px);
+  font-weight: 800;
+  white-space: nowrap;
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ID PHOTO BLUR-UP EFFECT */
+.id-photo {
+  position: absolute;
+  top: 37.3%;
+  left: 3.9%;
+  width: 26.7%;
+  height: 50.9%;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 3px solid #fff;
+  background: #eee;
+
+  /* START BLURRED */
+  filter: blur(10px);
+  opacity: 0.5;
+  transition: filter 0.5s ease, opacity 0.5s ease;
+}
+
+/* Class added when image is loaded */
+.id-photo.loaded {
+  filter: blur(0);
+  opacity: 1;
+}
+
+.id-club{
+  position:absolute;
+  top: 57.0%;
+  left: 33.3%;
+  font-size: clamp(10px, 2.6vw, 12px);
+  font-weight: 800;
+  white-space: nowrap;
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.id-position{
+  position:absolute;
+  top: 64.0%;
+  left: 33.3%;
+  font-size: clamp(10px, 2.6vw, 12px);
+  font-weight: 800;
+  white-space: nowrap;
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.id-region{
+  position:absolute;
+  top: 72.4%;
+  left: 33.3%;
+  font-size: clamp(9px, 2.4vw, 11px);
+  font-weight: 700;
+  white-space: nowrap;
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.id-stamp-img{
+  position: absolute;
+  bottom: 9%;
+  left: 26%;
+  width: clamp(56px, 16vw, 72px);
+  transform: rotate(-15deg);
+  opacity: 80%;
+  /* pointer-events: none; */
+}
+
+/* Extra small devices */
+@media (max-width: 360px){
+  .verify-modal-card{ border-radius: 18px; padding: 14px; }
+  .verify-close{ width: 36px; height: 36px; font-size: 18px; }
+}
