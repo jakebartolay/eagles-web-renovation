@@ -53,6 +53,17 @@ try {
     $region = $regionSelection === '__NEW__' ? $regionNew : strtoupper($regionSelection);
     $status = strtoupper(trim((string) ($payload['status'] ?? $payload['eagles_status'] ?? $current['eagles_status'] ?? 'ACTIVE')));
 
+    if ($status === '') {
+        $status = 'ACTIVE';
+    }
+
+    if (!in_array($status, ['ACTIVE', 'RENEWAL'], true)) {
+        api_json([
+            'ok' => false,
+            'message' => 'Status must be either ACTIVE or RENEWAL.',
+        ], 422);
+    }
+
     if ($firstName === '' || $lastName === '' || $position === '' || $club === '' || $region === '') {
         api_json([
             'ok' => false,
@@ -61,13 +72,23 @@ try {
     }
 
     $photoUpload = $_FILES['photo'] ?? $_FILES['eagles_pic'] ?? null;
+    $currentPhotoFile = basename(trim((string) ($current['eagles_pic'] ?? '')));
+    $currentPhotoAsset = $currentPhotoFile !== ''
+        ? api_member_photo_asset($currentPhotoFile)
+        : null;
     $storedPhoto = null;
 
     if (is_array($photoUpload) && (int) ($photoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-        $storedPhoto = api_store_uploaded_file($photoUpload, 'media', api_image_extensions());
+        $storedPhoto = api_store_uploaded_file_as(
+            $photoUpload,
+            'members',
+            $memberId,
+            api_image_extensions(),
+            true
+        );
     }
 
-    $nextPhoto = $storedPhoto['filename'] ?? trim((string) ($current['eagles_pic'] ?? ''));
+    $nextPhoto = $storedPhoto['filename'] ?? $currentPhotoFile;
 
     try {
         api_execute($db, '
@@ -92,13 +113,24 @@ try {
         ]);
     } catch (Throwable $error) {
         if ($storedPhoto !== null) {
-            api_delete_uploaded_file('media', $storedPhoto['filename'] ?? null);
+            $replacedSamePhoto = $currentPhotoAsset !== null
+                && (string) ($currentPhotoAsset['group'] ?? '') === 'members'
+                && $currentPhotoFile === basename((string) ($storedPhoto['filename'] ?? ''));
+
+            if (!$replacedSamePhoto) {
+                api_delete_uploaded_file('members', $storedPhoto['filename'] ?? null);
+            }
         }
         throw $error;
     }
 
-    if ($storedPhoto !== null) {
-        api_delete_uploaded_file('media', basename((string) ($current['eagles_pic'] ?? '')));
+    if ($storedPhoto !== null && $currentPhotoAsset !== null) {
+        $replacedSamePhoto = (string) ($currentPhotoAsset['group'] ?? '') === 'members'
+            && $currentPhotoFile === basename((string) ($storedPhoto['filename'] ?? ''));
+
+        if (!$replacedSamePhoto) {
+            api_delete_uploaded_file((string) $currentPhotoAsset['group'], $currentPhotoFile);
+        }
     }
 
     api_log_admin_action(
@@ -115,6 +147,11 @@ try {
         LIMIT 1
     ', [':eagles_id' => $memberId]);
 
+    $photoFile = basename(trim((string) ($row['eagles_pic'] ?? $nextPhoto ?? '')));
+    $photoAsset = $photoFile !== ''
+        ? api_member_photo_asset($photoFile)
+        : null;
+
     api_json([
         'ok' => true,
         'message' => 'Member updated successfully.',
@@ -127,9 +164,9 @@ try {
             'position' => (string) ($row['eagles_position'] ?? $position),
             'club' => (string) ($row['eagles_club'] ?? $club),
             'region' => (string) ($row['eagles_region'] ?? $region),
-            'picUrl' => isset($row['eagles_pic']) && trim((string) $row['eagles_pic']) !== ''
-                ? api_media_url('media', basename((string) $row['eagles_pic']))
-                : null,
+            'picUrl' => $photoAsset['url'] ?? null,
+            'photoFilename' => $photoFile !== '' ? $photoFile : null,
+            'photoLink' => api_member_photo_link($photoFile),
             'dateAdded' => (string) ($row['eagles_dateAdded'] ?? ''),
         ],
     ]);

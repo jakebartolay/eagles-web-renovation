@@ -7,6 +7,21 @@ require_once __DIR__ . '/../../../bootstrap.php';
 api_start();
 api_require_method('POST');
 
+function api_normalize_news_published_at(mixed $value): ?string
+{
+    $raw = trim((string) $value);
+    if ($raw === '') {
+        return null;
+    }
+
+    $timestamp = strtotime($raw);
+    if ($timestamp === false) {
+        return null;
+    }
+
+    return date('Y-m-d 00:00:00', $timestamp);
+}
+
 try {
     $db = api_db();
     $admin = api_require_admin($db);
@@ -22,6 +37,20 @@ try {
     $title = trim((string) ($payload['title'] ?? $payload['news_title'] ?? ''));
     $content = trim((string) ($payload['content'] ?? $payload['news_content'] ?? ''));
     $status = api_normalize_news_status($payload['status'] ?? $payload['news_status'] ?? 'Draft');
+    $publishedAt = api_normalize_news_published_at(
+        $payload['published_date']
+        ?? $payload['published_at']
+        ?? $payload['created_at']
+        ?? null
+    );
+
+    $hasCreatedAtColumn = api_has_column($db, 'news_info', 'created_at');
+    if (($payload['published_date'] ?? $payload['published_at'] ?? $payload['created_at'] ?? null) !== null && $publishedAt === null) {
+        api_json([
+            'ok' => false,
+            'message' => 'Invalid published date.',
+        ], 422);
+    }
 
     if ($title === '' || $content === '') {
         api_json([
@@ -45,24 +74,48 @@ try {
     $db->beginTransaction();
 
     try {
-        api_execute($db, '
-            INSERT INTO news_info (
-                news_title,
-                news_content,
-                news_status,
-                news_image
-            ) VALUES (
-                :news_title,
-                :news_content,
-                :news_status,
-                :news_image
-            )
-        ', [
-            ':news_title' => $title,
-            ':news_content' => $content,
-            ':news_status' => $status,
-            ':news_image' => $storedUpload['filename'] ?? null,
-        ]);
+        if ($hasCreatedAtColumn && $publishedAt !== null) {
+            api_execute($db, '
+                INSERT INTO news_info (
+                    news_title,
+                    news_content,
+                    news_status,
+                    news_image,
+                    created_at
+                ) VALUES (
+                    :news_title,
+                    :news_content,
+                    :news_status,
+                    :news_image,
+                    :created_at
+                )
+            ', [
+                ':news_title' => $title,
+                ':news_content' => $content,
+                ':news_status' => $status,
+                ':news_image' => $storedUpload['filename'] ?? null,
+                ':created_at' => $publishedAt,
+            ]);
+        } else {
+            api_execute($db, '
+                INSERT INTO news_info (
+                    news_title,
+                    news_content,
+                    news_status,
+                    news_image
+                ) VALUES (
+                    :news_title,
+                    :news_content,
+                    :news_status,
+                    :news_image
+                )
+            ', [
+                ':news_title' => $title,
+                ':news_content' => $content,
+                ':news_status' => $status,
+                ':news_image' => $storedUpload['filename'] ?? null,
+            ]);
+        }
 
         $newsId = (int) $db->lastInsertId();
 

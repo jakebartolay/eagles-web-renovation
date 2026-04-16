@@ -32,6 +32,20 @@ try {
         $memberId = 'EAG_' . strtoupper(substr(str_replace('.', '', uniqid('', true)), -12));
     }
 
+    $duplicateMember = api_fetch_one($db, '
+        SELECT eagles_id
+        FROM user_info
+        WHERE eagles_id = :eagles_id
+        LIMIT 1
+    ', [':eagles_id' => $memberId]);
+
+    if ($duplicateMember !== null) {
+        api_json([
+            'success' => false,
+            'message' => 'Duplicate Eagles ID. Please use a different member ID.',
+        ], 409);
+    }
+
     $firstName = strtoupper(trim((string) ($payload['first_name'] ?? $payload['eagles_firstName'] ?? '')));
     $lastName = strtoupper(trim((string) ($payload['last_name'] ?? $payload['eagles_lastName'] ?? '')));
     $position = strtoupper(trim((string) ($payload['position'] ?? $payload['eagles_position'] ?? '')));
@@ -49,6 +63,13 @@ try {
         $status = 'ACTIVE';
     }
 
+    if (!in_array($status, ['ACTIVE', 'RENEWAL'], true)) {
+        api_json([
+            'success' => false,
+            'message' => 'Status must be either ACTIVE or RENEWAL.',
+        ], 422);
+    }
+
     if ($firstName === '' || $lastName === '' || $position === '' || $club === '' || $region === '') {
         api_json([
             'success' => false,
@@ -60,8 +81,10 @@ try {
     $storedPhoto = null;
 
     if (is_array($photoUpload) && (int) ($photoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-        $storedPhoto = api_store_uploaded_file($photoUpload, 'media', api_image_extensions());
+        $storedPhoto = api_store_uploaded_file_as($photoUpload, 'members', $memberId, api_image_extensions(), true);
     }
+
+    $nextPhoto = $storedPhoto['filename'] ?? null;
 
     try {
         api_execute($db, '
@@ -92,11 +115,11 @@ try {
             ':eagles_club' => $club,
             ':eagles_region' => $region,
             ':eagles_status' => $status,
-            ':eagles_pic' => $storedPhoto['filename'] ?? null,
+            ':eagles_pic' => $nextPhoto,
         ]);
     } catch (Throwable $error) {
         if ($storedPhoto !== null) {
-            api_delete_uploaded_file('media', $storedPhoto['filename'] ?? null);
+            api_delete_uploaded_file('members', $storedPhoto['filename'] ?? null);
         }
 
         $message = $error->getMessage();
@@ -135,6 +158,11 @@ try {
         LIMIT 1
     ', [':eagles_id' => $memberId]);
 
+    $photoFile = basename(trim((string) ($row['eagles_pic'] ?? $nextPhoto ?? '')));
+    $photoAsset = $photoFile !== ''
+        ? api_member_photo_asset($photoFile)
+        : null;
+
     api_json([
         'success' => true,
         'message' => 'Member added successfully.',
@@ -147,9 +175,9 @@ try {
             'position' => (string) ($row['eagles_position'] ?? $position),
             'club' => (string) ($row['eagles_club'] ?? $club),
             'region' => (string) ($row['eagles_region'] ?? $region),
-            'picUrl' => isset($row['eagles_pic']) && trim((string) $row['eagles_pic']) !== ''
-                ? api_media_url('media', basename((string) $row['eagles_pic']))
-                : null,
+            'picUrl' => $photoAsset['url'] ?? null,
+            'photoFilename' => $photoFile !== '' ? $photoFile : null,
+            'photoLink' => api_member_photo_link($photoFile),
             'dateAdded' => (string) ($row['eagles_dateAdded'] ?? ''),
         ],
     ], 201);

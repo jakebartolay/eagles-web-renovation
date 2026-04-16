@@ -25,12 +25,14 @@ try {
         'user' => admin_api_user_payload($admin),
     ]);
 } catch (Throwable $error) {
-    error_log('Admin session API error: ' . $error->getMessage());
-
-    api_json([
-        'success' => false,
-        'message' => 'Unable to validate the admin session right now.',
-        'authenticated' => false,
-        'user' => null,
-    ], 500);
+    api_handle_exception(
+        $error,
+        'Admin session API error',
+        'Unable to validate the admin session right now.',
+        500,
+        [
+            'authenticated' => false,
+            'user' => null,
+        ]
+    );
 }

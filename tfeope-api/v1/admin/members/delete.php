@@ -47,7 +47,12 @@ try {
         WHERE eagles_id = :eagles_id
     ', [':eagles_id' => $memberId]);
 
-    api_delete_uploaded_file('media', basename((string) ($current['eagles_pic'] ?? '')));
+    $photoFile = basename((string) ($current['eagles_pic'] ?? ''));
+    $photoAsset = api_member_photo_asset($photoFile);
+
+    if ($photoAsset !== null) {
+        api_delete_uploaded_file((string) $photoAsset['group'], $photoFile);
+    }
 
     api_log_admin_action(
         $db,

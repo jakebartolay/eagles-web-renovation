@@ -35,15 +35,15 @@ if (!function_exists('admin_api_forget_session')) {
 
         if ((bool) ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
-            setcookie(
-                session_name(),
-                '',
-                time() - 42000,
-                $params['path'] ?? '/',
-                $params['domain'] ?? '',
-                (bool) ($params['secure'] ?? false),
-                (bool) ($params['httponly'] ?? true)
-            );
+
+            setcookie(session_name(), '', [
+                'expires' => time() - 42000,
+                'path' => $params['path'] ?? '/',
+                'domain' => $params['domain'] ?? '',
+                'secure' => (bool) ($params['secure'] ?? false),
+                'httponly' => (bool) ($params['httponly'] ?? true),
+                'samesite' => $params['samesite'] ?? 'Lax',
+            ]);
         }
 
         session_destroy();
@@ -109,7 +109,7 @@ if (!function_exists('admin_api_recent_members')) {
         return array_map(static function (array $row): array {
             $photoFile = basename(trim((string) ($row['eagles_pic'] ?? '')));
             $photoAsset = $photoFile !== ''
-                ? api_locate_media_file('media', $photoFile)
+                ? api_member_photo_asset($photoFile)
                 : null;
 
             $firstName = trim((string) ($row['eagles_firstName'] ?? ''));
@@ -126,6 +126,8 @@ if (!function_exists('admin_api_recent_members')) {
                 'club' => (string) ($row['eagles_club'] ?? ''),
                 'region' => (string) ($row['eagles_region'] ?? ''),
                 'photoUrl' => $photoAsset['url'] ?? null,
+                'photoFilename' => $photoFile !== '' ? $photoFile : null,
+                'photoLink' => api_member_photo_link($photoFile),
                 'dateAdded' => (string) ($row['eagles_dateAdded'] ?? ''),
             ];
         }, $rows);
@@ -133,22 +135,39 @@ if (!function_exists('admin_api_recent_members')) {
 }
 
 if (!function_exists('admin_api_recent_activity')) {
-    function admin_api_recent_activity(PDO $db, int $limit = 12): array
+    function admin_api_recent_activity(PDO $db, string $adminUsername = '', int $limit = 12): array
     {
         if (!api_table_exists($db, 'admin_action_logs')) {
             return [];
         }
 
-        $limit = max(1, min(30, $limit));
-        $rows = api_fetch_all($db, sprintf(
-            '
-                SELECT admin_username, action_type, action_desc, ip_address, created_at
-                FROM admin_action_logs
-                ORDER BY created_at DESC
-                LIMIT %d
-            ',
-            $limit
-        ));
+        $limit = max(1, min(300, $limit));
+        $trimmedAdminUsername = trim($adminUsername);
+
+        if ($trimmedAdminUsername !== '') {
+            $rows = api_fetch_all($db, sprintf(
+                '
+                    SELECT admin_username, action_type, action_desc, ip_address, created_at
+                    FROM admin_action_logs
+                    WHERE admin_username = :admin_username
+                    ORDER BY created_at DESC
+                    LIMIT %d
+                ',
+                $limit
+            ), [
+                ':admin_username' => $trimmedAdminUsername,
+            ]);
+        } else {
+            $rows = api_fetch_all($db, sprintf(
+                '
+                    SELECT admin_username, action_type, action_desc, ip_address, created_at
+                    FROM admin_action_logs
+                    ORDER BY created_at DESC
+                    LIMIT %d
+                ',
+                $limit
+            ));
+        }
 
         return array_map(static fn (array $row): array => [
             'adminUsername' => (string) ($row['admin_username'] ?? ''),
@@ -174,7 +193,7 @@ if (!function_exists('admin_api_first_by_status')) {
 }
 
 if (!function_exists('admin_api_dashboard_data')) {
-    function admin_api_dashboard_data(PDO $db): array
+    function admin_api_dashboard_data(PDO $db, array $admin): array
     {
         $news = array_slice(api_news_list($db, false), 0, 6);
         $videos = array_slice(api_video_list($db, false), 0, 6);
@@ -183,6 +202,11 @@ if (!function_exists('admin_api_dashboard_data')) {
         $officers = array_slice(api_officer_list($db), 0, 8);
         $governors = array_slice(api_governor_list($db), 0, 8);
         $recentMembers = admin_api_recent_members($db, 10);
+
+        $adminRoleId = (int) ($admin['role_id'] ?? 0);
+        $activityUsernameFilter = $adminRoleId === 1
+            ? ''
+            : (string) ($admin['username'] ?? '');
 
         return [
             'stats' => [
@@ -220,7 +244,11 @@ if (!function_exists('admin_api_dashboard_data')) {
             'memorandums' => $memorandums,
             'officers' => $officers,
             'governors' => $governors,
-            'activity' => admin_api_recent_activity($db, 12),
+            'activity' => admin_api_recent_activity(
+                $db,
+                $activityUsernameFilter,
+                200
+            ),
             'meta' => [
                 'lastUpdated' => date('c'),
                 'apiBasePath' => api_base_path(),

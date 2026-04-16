@@ -9,7 +9,7 @@ import {
   PUBLIC_AUTH_SIGNUP_ENDPOINT,
   PUBLIC_MEMBER_VERIFY_ENDPOINT,
 } from '../config'
-import memberStylesheetUrl from '../../old_system/Styles/member.css?url'
+import memberStylesheetUrl from '../theme/member.css?url'
 
 const idTemplateUrl = new URL('../../old_system/static/id_template.png', import.meta.url).href
 const certifiedStampUrl = new URL('../../old_system/static/Certified.png', import.meta.url).href

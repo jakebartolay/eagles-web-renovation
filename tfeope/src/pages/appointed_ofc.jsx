@@ -4,7 +4,7 @@ import useBodyClass from '../hooks/useBodyClass'
 import useStylesheet from '../hooks/useStylesheet'
 import { fetchApiJson } from '../lib/api'
 import { PUBLIC_APPOINTED_ENDPOINT } from '../config'
-import appointedStylesheetUrl from '../../old_system/Styles/appt_ofc.css?url'
+import appointedStylesheetUrl from '../theme/appt_ofc.css?url'
 
 function slugify(value) {
   return String(value || '')

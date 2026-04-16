@@ -8,11 +8,15 @@ api_start();
 api_require_method(['POST', 'GET']);
 
 try {
-    $db = api_db();
-    $admin = api_current_admin($db);
+    try {
+        $db = api_db();
+        $admin = api_current_admin($db);
 
-    if ($admin !== null) {
-        api_log_admin_action($db, $admin, 'LOGOUT', 'Signed out from the React admin dashboard.');
+        if ($admin !== null) {
+            api_log_admin_action($db, $admin, 'LOGOUT', 'Signed out from the React admin dashboard.');
+        }
+    } catch (Throwable $error) {
+        error_log('Admin logout activity log skipped: ' . $error->getMessage());
     }
 
     admin_api_forget_session();
@@ -23,10 +27,5 @@ try {
         'user' => null,
     ]);
 } catch (Throwable $error) {
-    error_log('Admin logout API error: ' . $error->getMessage());
-
-    api_json([
-        'success' => false,
-        'message' => 'Unable to sign out right now.',
-    ], 500);
+    api_handle_exception($error, 'Admin logout API error', 'Unable to sign out right now.');
 }

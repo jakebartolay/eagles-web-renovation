@@ -43,6 +43,40 @@ if (!function_exists('api_request_method')) {
     }
 }
 
+if (!function_exists('api_ini_size_to_bytes')) {
+    function api_ini_size_to_bytes(string $value): int
+    {
+        $trimmed = trim($value);
+        if ($trimmed === '') {
+            return 0;
+        }
+
+        $unit = strtolower(substr($trimmed, -1));
+        $number = (float) $trimmed;
+
+        return match ($unit) {
+            'g' => (int) ($number * 1024 * 1024 * 1024),
+            'm' => (int) ($number * 1024 * 1024),
+            'k' => (int) ($number * 1024),
+            default => (int) $number,
+        };
+    }
+}
+
+if (!function_exists('api_post_too_large')) {
+    function api_post_too_large(): bool
+    {
+        if (api_request_method() !== 'POST') {
+            return false;
+        }
+
+        $contentLength = (int) ($_SERVER['CONTENT_LENGTH'] ?? 0);
+        $postMaxSize = api_ini_size_to_bytes((string) ini_get('post_max_size'));
+
+        return $contentLength > 0 && $postMaxSize > 0 && $contentLength > $postMaxSize;
+    }
+}
+
 if (!function_exists('api_require_method')) {
     function api_require_method(string|array $methods): void
     {
@@ -87,6 +121,86 @@ if (!function_exists('api_error')) {
             'ok' => false,
             'message' => $message,
         ], $extra), $status);
+    }
+}
+
+if (!function_exists('api_is_database_error')) {
+    function api_is_database_error(Throwable $error): bool
+    {
+        $current = $error;
+        $markers = [
+            'sqlstate',
+            'mysql',
+            'mariadb',
+            'unknown database',
+            'access denied for user',
+            'connection refused',
+            'could not find driver',
+            'server has gone away',
+        ];
+
+        while ($current instanceof Throwable) {
+            if ($current instanceof PDOException) {
+                return true;
+            }
+
+            $message = strtolower($current->getMessage());
+            foreach ($markers as $marker) {
+                if ($message !== '' && str_contains($message, $marker)) {
+                    return true;
+                }
+            }
+
+            $current = $current->getPrevious();
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('api_public_exception_details')) {
+    function api_public_exception_details(
+        Throwable $error,
+        string $fallbackMessage,
+        int $fallbackStatus = 500
+    ): array {
+        if (api_is_database_error($error)) {
+            return [
+                'status' => 503,
+                'payload' => [
+                    'success' => false,
+                    'message' => 'Server unavailable right now. Please try again later.',
+                    'code' => 'DATABASE_UNAVAILABLE',
+                ],
+            ];
+        }
+
+        return [
+            'status' => $fallbackStatus,
+            'payload' => [
+                'success' => false,
+                'message' => $fallbackMessage,
+            ],
+        ];
+    }
+}
+
+if (!function_exists('api_handle_exception')) {
+    function api_handle_exception(
+        Throwable $error,
+        string $logContext,
+        string $fallbackMessage,
+        int $fallbackStatus = 500,
+        array $extraPayload = []
+    ): never {
+        error_log($logContext . ': ' . $error->getMessage());
+
+        $details = api_public_exception_details($error, $fallbackMessage, $fallbackStatus);
+
+        api_json(
+            array_merge($details['payload'], $extraPayload),
+            (int) ($details['status'] ?? $fallbackStatus)
+        );
     }
 }
 
@@ -313,15 +427,18 @@ if (!function_exists('api_legacy_storage_root')) {
 if (!function_exists('api_upload_directories')) {
     function api_upload_directories(): array
     {
-        $root = api_upload_root();
         $legacy = api_legacy_storage_root();
+        $uploadsBase = $legacy . '/uploads';
+        $root = $uploadsBase;
 
         return [
-            'news' => $legacy . '/uploads/news',
-            'videos' => $root . '/videos',
-            'memorandum' => $legacy . '/memorandum',
+            'news' => $uploadsBase . '/news',
+            'members' => $uploadsBase . '/members',
+            'videos' => $uploadsBase . '/videos',
+            'memorandum' => $uploadsBase . '/memorandum',
+            'national-officers' => $uploadsBase . '/national-officers',
             'media'  => $root . '/media',    // ← string lang, hindi array!
-            'uploads' => $legacy . '/uploads',
+            'uploads' => $uploadsBase,
         ];
     }
 }
@@ -330,6 +447,7 @@ if (!function_exists('api_storage_groups')) {
     function api_storage_groups(): array
     {
         $uploads = api_upload_directories();
+        $root = api_upload_root();
         $legacy = api_legacy_storage_root();
 
         return [
@@ -340,10 +458,19 @@ if (!function_exists('api_storage_groups')) {
             ],
             'videos' => [
                 $uploads['videos'],
+                $root . '/videos',
                 $legacy . '/videos',
+            ],
+            'members' => [
+                $uploads['members'],
+            ],
+            'national-officers' => [
+                $uploads['national-officers'],
             ],
             'media' => [
                 $uploads['media'],
+                $uploads['members'],
+                $uploads['national-officers'],
                 $legacy . '/memorandum',
                 $legacy . '/event_media',
                 $legacy . '/uploads',
@@ -461,6 +588,22 @@ if (!function_exists('api_locate_media_file')) {
         }
 
         return null;
+    }
+}
+
+if (!function_exists('api_asset_url_or_fallback')) {
+    function api_asset_url_or_fallback(?array $asset, string $group, ?string $filename): ?string
+    {
+        if (is_array($asset) && !empty($asset['url'])) {
+            return (string) $asset['url'];
+        }
+
+        $file = basename(trim((string) $filename));
+        if ($file === '') {
+            return null;
+        }
+
+        return api_media_url($group, $file);
     }
 }
 
@@ -625,7 +768,8 @@ if (!function_exists('api_store_uploaded_file_as')) {
         array $file,
         string $group,
         string $baseName,
-        ?array $allowedExtensions = null
+        ?array $allowedExtensions = null,
+        bool $overwrite = false
     ): array {
         $directories = api_upload_directories();
         if (!isset($directories[$group])) {
@@ -657,14 +801,20 @@ if (!function_exists('api_store_uploaded_file_as')) {
         }
 
         $filename = $safeBaseName . '.' . $extension;
-        $counter = 2;
+        if (!$overwrite) {
+            $counter = 2;
 
-        while (is_file($targetDir . '/' . $filename)) {
-            $filename = $safeBaseName . '_' . $counter . '.' . $extension;
-            $counter++;
+            while (is_file($targetDir . '/' . $filename)) {
+                $filename = $safeBaseName . '_' . $counter . '.' . $extension;
+                $counter++;
+            }
         }
 
         $targetPath = $targetDir . '/' . $filename;
+        if ($overwrite && is_file($targetPath)) {
+            @unlink($targetPath);
+        }
+
         if (!move_uploaded_file($tmpName, $targetPath)) {
             throw new RuntimeException('Failed to save uploaded file.');
         }
@@ -943,11 +1093,38 @@ if (!function_exists('api_news_media_url')) {
             return null;
         }
 
-        if (api_locate_media_file(api_news_media_groups(), $file) === null) {
-            return null;
+        $asset = api_locate_media_file(api_news_media_groups(), $file);
+        if ($asset !== null && !empty($asset['url'])) {
+            return (string) $asset['url'];
         }
 
         return api_media_url('news', $file);
+    }
+}
+
+if (!function_exists('api_member_media_groups')) {
+    function api_member_media_groups(): array
+    {
+        return ['members', 'media'];
+    }
+}
+
+if (!function_exists('api_member_photo_asset')) {
+    function api_member_photo_asset(?string $filename): ?array
+    {
+        return api_locate_media_file(api_member_media_groups(), $filename);
+    }
+}
+
+if (!function_exists('api_member_photo_link')) {
+    function api_member_photo_link(?string $filename): ?string
+    {
+        $file = basename(trim((string) $filename));
+        if ($file === '') {
+            return null;
+        }
+
+        return api_media_url('members', $file);
     }
 }
 
@@ -1074,7 +1251,7 @@ if (!function_exists('api_news_list')) {
             $params[':news_status'] = 'Published';
         }
 
-        $sql .= ' ORDER BY news_id DESC';
+        $sql .= ' ORDER BY created_at DESC, news_id DESC';
 
         $rows = api_fetch_all($db, $sql, $params);
 
@@ -1115,9 +1292,9 @@ if (!function_exists('api_video_payload')) {
             'status' => (string) ($row['video_status'] ?? 'Draft'),
             'createdAt' => (string) ($row['created_at'] ?? ''),
             'videoFilename' => $videoFile !== '' ? $videoFile : null,
-            'videoUrl' => $videoAsset['url'] ?? null,
+            'videoUrl' => api_asset_url_or_fallback($videoAsset, 'videos', $videoFile),
             'thumbnailFilename' => $thumbnailFile !== '' ? $thumbnailFile : null,
-            'thumbnailUrl' => $thumbnailAsset['url'] ?? null,
+            'thumbnailUrl' => api_asset_url_or_fallback($thumbnailAsset, 'media', $thumbnailFile),
         ];
     }
 }
@@ -1180,7 +1357,7 @@ if (!function_exists('api_event_payload')) {
             'type' => (string) ($row['event_type'] ?? ''),
             'createdAt' => (string) ($row['created_at'] ?? ''),
             'mediaFilename' => $mediaFile !== '' ? $mediaFile : null,
-            'mediaUrl' => $mediaAsset['url'] ?? null,
+            'mediaUrl' => api_asset_url_or_fallback($mediaAsset, 'media', $mediaFile),
             'mediaType' => api_media_type($mediaFile),
         ];
     }
@@ -1274,7 +1451,7 @@ if (!function_exists('api_memorandum_payload')) {
                 'id' => (int) ($pageRow['page_id'] ?? 0),
                 'filename' => $filename !== '' ? $filename : null,
                 'pageNumber' => (int) ($pageRow['api_order'] ?? 0),
-                'url' => $asset['url'] ?? null,
+                'url' => api_asset_url_or_fallback($asset, 'memorandum', $filename),
             ];
         }
 
@@ -1365,8 +1542,8 @@ if (!function_exists('api_officer_payload')) {
     {
         $imageFile = trim((string) ($row['image'] ?? ''));
         $speechImageFile = trim((string) ($row['speech_image'] ?? ''));
-        $imageAsset = api_locate_media_file('media', $imageFile);
-        $speechImageAsset = api_locate_media_file('media', $speechImageFile);
+        $imageAsset = api_locate_media_file(['national-officers', 'media'], $imageFile);
+        $speechImageAsset = api_locate_media_file(['national-officers', 'media'], $speechImageFile);
 
         return [
             'id' => (int) ($row['id'] ?? 0),
@@ -1376,9 +1553,9 @@ if (!function_exists('api_officer_payload')) {
             'category' => (string) ($row['category'] ?? ''),
             'speech' => (string) ($row['speech'] ?? ''),
             'imageFilename' => $imageFile !== '' ? $imageFile : null,
-            'imageUrl' => $imageAsset['url'] ?? null,
+            'imageUrl' => api_asset_url_or_fallback($imageAsset, 'national-officers', $imageFile),
             'speechImageFilename' => $speechImageFile !== '' ? $speechImageFile : null,
-            'speechImageUrl' => $speechImageAsset['url'] ?? null,
+            'speechImageUrl' => api_asset_url_or_fallback($speechImageAsset, 'national-officers', $speechImageFile),
             'createdAt' => (string) ($row['created_at'] ?? ''),
             'updatedAt' => (string) ($row['updated_at'] ?? ''),
         ];

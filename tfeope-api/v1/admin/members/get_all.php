@@ -13,6 +13,11 @@ $members = api_fetch_all($db, "
 ");
 
 $data = array_map(function($row) {
+    $photoFile = basename(trim((string) ($row['eagles_pic'] ?? '')));
+    $photoAsset = $photoFile !== ''
+        ? api_member_photo_asset($photoFile)
+        : null;
+
     return [
         'id'        => $row['eagles_id'],
         'status'    => $row['eagles_status'],
@@ -22,7 +27,9 @@ $data = array_map(function($row) {
         'position'  => $row['eagles_position'],
         'club'      => $row['eagles_club'],
         'region'    => $row['eagles_region'],
-        'picUrl'    => api_media_url('media', basename($row['eagles_pic'])),
+        'picUrl'    => $photoAsset['url'] ?? null,
+        'photoFilename' => $photoFile !== '' ? $photoFile : null,
+        'photoLink' => api_member_photo_link($photoFile),
         'dateAdded' => $row['eagles_dateAdded'],
     ];
 }, $members);

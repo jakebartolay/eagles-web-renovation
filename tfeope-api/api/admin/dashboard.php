@@ -14,13 +14,12 @@ try {
     api_json([
         'authenticated' => true,
         'user' => admin_api_user_payload($admin),
-        'data' => admin_api_dashboard_data($db),
+        'data' => admin_api_dashboard_data($db, $admin),
     ]);
 } catch (Throwable $error) {
-    error_log('Admin dashboard API error: ' . $error->getMessage());
-
-    api_json([
-        'success' => false,
-        'message' => 'Unable to load the admin dashboard right now.',
-    ], 500);
+    api_handle_exception(
+        $error,
+        'Admin dashboard API error',
+        'Unable to load the admin dashboard right now.'
+    );
 }

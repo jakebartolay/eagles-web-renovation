@@ -22,9 +22,9 @@ export const PUBLIC_BRANDING = {
   logoUrl: new URL('./static/logo.png', import.meta.url).href,
   alphaLogoUrl: new URL('./static/eagles alpha systems.png', import.meta.url).href,
   heroUrl: new URL('./static/homebg.jpg', import.meta.url).href,
-  prayerVideoUrl: new URL('./static/eagles prayer.mp4', import.meta.url).href,
-  anthemVideoUrl: new URL('./static/national_anthem.mp4', import.meta.url).href,
-  hymnVideoUrl: new URL('./static/eagles hymn 2025.mp4', import.meta.url).href,
+  prayerVideoUrl: publicMediaUrl('videos', 'eagles prayer.mp4'),
+  anthemVideoUrl: publicMediaUrl('videos', 'national_anthem.mp4'),
+  hymnVideoUrl: publicMediaUrl('videos', 'eagles hymn 2025.mp4'),
 }
 
 export function publicMediaUrl(group, filename) {

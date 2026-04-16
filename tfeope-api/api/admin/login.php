@@ -62,10 +62,5 @@ try {
         'user' => admin_api_user_payload($admin),
     ]);
 } catch (Throwable $error) {
-    error_log('Admin login API error: ' . $error->getMessage());
-
-    api_json([
-        'success' => false,
-        'message' => 'Unable to sign in right now.',
-    ], 500);
+    api_handle_exception($error, 'Admin login API error', 'Unable to sign in right now.');
 }

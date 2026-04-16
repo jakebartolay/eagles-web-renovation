@@ -7,6 +7,21 @@ require_once __DIR__ . '/../../../bootstrap.php';
 api_start();
 api_require_method('POST');
 
+function api_normalize_news_published_at(mixed $value): ?string
+{
+    $raw = trim((string) $value);
+    if ($raw === '') {
+        return null;
+    }
+
+    $timestamp = strtotime($raw);
+    if ($timestamp === false) {
+        return null;
+    }
+
+    return date('Y-m-d 00:00:00', $timestamp);
+}
+
 try {
     $db = api_db();
     $admin = api_require_admin($db);
@@ -29,7 +44,7 @@ try {
     }
 
     $currentRow = api_fetch_one($db, '
-        SELECT news_id, news_title, news_content, news_status, news_image
+        SELECT news_id, news_title, news_content, news_status, news_image, created_at
         FROM news_info
         WHERE news_id = :news_id
         LIMIT 1
@@ -45,6 +60,16 @@ try {
     $title = trim((string) ($payload['title'] ?? $payload['news_title'] ?? $currentRow['news_title'] ?? ''));
     $content = trim((string) ($payload['content'] ?? $payload['news_content'] ?? $currentRow['news_content'] ?? ''));
     $status = api_normalize_news_status($payload['status'] ?? $payload['news_status'] ?? $currentRow['news_status'] ?? 'Draft');
+    $hasCreatedAtColumn = api_has_column($db, 'news_info', 'created_at');
+    $publishedAtInput = $payload['published_date'] ?? $payload['published_at'] ?? $payload['created_at'] ?? null;
+    $publishedAt = api_normalize_news_published_at($publishedAtInput);
+
+    if ($publishedAtInput !== null && $publishedAt === null) {
+        api_json([
+            'ok' => false,
+            'message' => 'Invalid published date.',
+        ], 422);
+    }
 
     if ($title === '' || $content === '') {
         api_json([
@@ -93,20 +118,39 @@ try {
     $db->beginTransaction();
 
     try {
-        api_execute($db, '
-            UPDATE news_info
-            SET news_title = :news_title,
-                news_content = :news_content,
-                news_status = :news_status,
-                news_image = :news_image
-            WHERE news_id = :news_id
-        ', [
-            ':news_id' => $newsId,
-            ':news_title' => $title,
-            ':news_content' => $content,
-            ':news_status' => $status,
-            ':news_image' => $nextImageFilename !== '' ? $nextImageFilename : null,
-        ]);
+        if ($hasCreatedAtColumn && $publishedAt !== null) {
+            api_execute($db, '
+                UPDATE news_info
+                SET news_title = :news_title,
+                    news_content = :news_content,
+                    news_status = :news_status,
+                    news_image = :news_image,
+                    created_at = :created_at
+                WHERE news_id = :news_id
+            ', [
+                ':news_id' => $newsId,
+                ':news_title' => $title,
+                ':news_content' => $content,
+                ':news_status' => $status,
+                ':news_image' => $nextImageFilename !== '' ? $nextImageFilename : null,
+                ':created_at' => $publishedAt,
+            ]);
+        } else {
+            api_execute($db, '
+                UPDATE news_info
+                SET news_title = :news_title,
+                    news_content = :news_content,
+                    news_status = :news_status,
+                    news_image = :news_image
+                WHERE news_id = :news_id
+            ', [
+                ':news_id' => $newsId,
+                ':news_title' => $title,
+                ':news_content' => $content,
+                ':news_status' => $status,
+                ':news_image' => $nextImageFilename !== '' ? $nextImageFilename : null,
+            ]);
+        }
 
         if ($storedUpload !== null && api_table_exists($db, 'news_media')) {
             if ($existingImageMedia !== null) {

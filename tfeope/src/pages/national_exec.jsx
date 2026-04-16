@@ -1,5 +1,5 @@
 import StaticOfficerGridPage from '../components/StaticOfficerGridPage'
-import nationalExecStylesheetUrl from '../../old_system/Styles/national_exec.css?url'
+import nationalExecStylesheetUrl from '../theme/national_exec.css?url'
 const officer1Url = new URL('../../old_system/officers/officer1.jpg', import.meta.url).href
 const officer2Url = new URL('../../old_system/officers/officer2.jpg', import.meta.url).href
 const officer3Url = new URL('../../old_system/officers/officer3.jpg', import.meta.url).href

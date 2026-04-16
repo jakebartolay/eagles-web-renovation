@@ -4,7 +4,7 @@ import useStylesheet from '../hooks/useStylesheet'
 import useBodyClass from '../hooks/useBodyClass'
 import { fetchApiJson } from '../lib/api'
 import { PUBLIC_GOVERNORS_ENDPOINT } from '../config'
-import governorsStylesheetUrl from '../../old_system/Styles/governors.css?url'
+import governorsStylesheetUrl from '../theme/governors.css?url'
 
 const placeholderUrl = new URL('../../old_system/governors/placeholder.png', import.meta.url).href
 

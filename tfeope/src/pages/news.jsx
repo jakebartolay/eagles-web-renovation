@@ -156,6 +156,20 @@ export default function News() {
 
         if (newsResult.status === 'fulfilled') {
           nextNews = Array.isArray(newsResult.value.data) ? newsResult.value.data : []
+          nextNews = [...nextNews].sort((first, second) => {
+            const firstDate = parseDateValue(first?.createdAt || first?.created_at)
+            const secondDate = parseDateValue(second?.createdAt || second?.created_at)
+            const firstTime = firstDate ? firstDate.getTime() : 0
+            const secondTime = secondDate ? secondDate.getTime() : 0
+
+            if (firstTime !== secondTime) {
+              return secondTime - firstTime
+            }
+
+            const firstId = Number(first?.id || first?.news_id || 0) || 0
+            const secondId = Number(second?.id || second?.news_id || 0) || 0
+            return secondId - firstId
+          })
           loadedCount += 1
         } else {
           nextMessage = newsResult.reason?.message || 'Unable to load the latest news.'

@@ -7,6 +7,13 @@ require_once __DIR__ . '/../../../bootstrap.php';
 api_start();
 api_require_method('POST');
 
+if (api_post_too_large()) {
+    api_json([
+        'ok' => false,
+        'message' => 'Video upload is too large. Please upload a smaller file.',
+    ], 413);
+}
+
 try {
     $db = api_db();
     $admin = api_require_admin($db);

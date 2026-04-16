@@ -4,32 +4,32 @@ import useBodyClass from '../hooks/useBodyClass'
 import useStylesheet from '../hooks/useStylesheet'
 import { fetchApiJson } from '../lib/api'
 import { PUBLIC_MAGNA_CARTA_ENDPOINT } from '../config'
-import magnaCartaStylesheetUrl from '../../old_system/Styles/magnacarta.css?url'
+import magnaCartaStylesheetUrl from '../theme/magna-carta.css?url'
 
 const pillarData = {
   brotherhood: {
     title: 'Brotherhood',
     subtitle: 'Strong bonds',
     description: 'Strong bonds through shared values and experiences.',
-    imageUrl: new URL('../../old_system/static/1.jpg', import.meta.url).href,
+    imageUrl: new URL('../static/1.jpg', import.meta.url).href,
   },
   service: {
     title: 'Service',
     subtitle: 'Compassion in action',
     description: 'Serving communities with compassion and action.',
-    imageUrl: new URL('../../old_system/static/2.jpg', import.meta.url).href,
+    imageUrl: new URL('../static/2.jpg', import.meta.url).href,
   },
   unity: {
     title: 'Unity',
     subtitle: 'One organization',
     description: 'Standing together as one organization.',
-    imageUrl: new URL('../../old_system/static/3.jpg', import.meta.url).href,
+    imageUrl: new URL('../static/3.jpg', import.meta.url).href,
   },
   divine: {
     title: 'Divine Power',
     subtitle: 'Ethics and strength',
     description: 'Guided by ethics, faith, and moral strength.',
-    imageUrl: new URL('../../old_system/static/1.jpg', import.meta.url).href,
+    imageUrl: new URL('../static/1.jpg', import.meta.url).href,
   },
 }
 

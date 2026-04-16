@@ -1,0 +1,79 @@
+:root {
+  --legacy-bg: #f4f6f9;
+  --legacy-surface: #ffffff;
+  --legacy-text: #1b2a43;
+  --legacy-muted: #5f6f89;
+  --legacy-line: rgba(27, 42, 67, 0.12);
+  --legacy-accent: #c59a3f;
+  --legacy-accent-strong: #a77f2f;
+}
+
+body {
+  background: var(--legacy-bg);
+  color: var(--legacy-text);
+}
+
+[class*='wrap'],
+[class*='container'],
+[class*='section'],
+[class*='content'] {
+  max-width: 1180px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+[class*='grid'],
+[class*='list'] {
+  display: grid;
+  gap: 16px;
+}
+
+[class*='card'],
+[class*='item'],
+[class*='profile'] {
+  background: var(--legacy-surface);
+  border: 1px solid var(--legacy-line);
+  border-radius: 16px;
+}
+
+[class*='card'] h1,
+[class*='card'] h2,
+[class*='card'] h3,
+[class*='title'] {
+  color: var(--legacy-text);
+}
+
+[class*='subtitle'],
+[class*='description'],
+[class*='meta'],
+[class*='role'],
+[class*='position'] {
+  color: var(--legacy-muted);
+}
+
+button,
+.btn {
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--legacy-accent);
+  color: #fff;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+button:hover,
+.btn:hover {
+  background: var(--legacy-accent-strong);
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+@media (max-width: 900px) {
+  [class*='grid'],
+  [class*='list'] {
+    grid-template-columns: 1fr !important;
+  }
+}

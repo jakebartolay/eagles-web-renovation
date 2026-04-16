@@ -4,7 +4,7 @@ import useBodyClass from '../hooks/useBodyClass'
 import useStylesheet from '../hooks/useStylesheet'
 import { PUBLIC_OFFICERS_ENDPOINT, publicMediaUrl } from '../config'
 import { fetchApiJson } from '../lib/api'
-import officersStylesheetUrl from '../../old_system/Styles/officers.css?url'
+import officersStylesheetUrl from '../theme/officers.css?url'
 
 const placeholderUrl = new URL('../static/placeholder.png', import.meta.url).href
 
@@ -15,7 +15,12 @@ function normalizePosition(value) {
 }
 
 function resolveOfficerImage(url, filename) {
-  return url || publicMediaUrl('media', filename) || placeholderUrl
+  return (
+    url ||
+    publicMediaUrl('national-officers', filename) ||
+    publicMediaUrl('media', filename) ||
+    placeholderUrl
+  )
 }
 
 function pickOfficer(map, positions) {
