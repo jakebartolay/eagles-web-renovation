@@ -83,18 +83,6 @@ const modalCopy = {
     subtitle: 'Adjust memorandum details and add more supporting pages when needed.',
     submitLabel: 'Update Memorandum',
   },
-  magnaCarta: {
-    eyebrow: 'Policy Reference',
-    title: 'Create Magna Carta Item',
-    subtitle: 'Add a front/back style policy card with image and publishing status.',
-    submitLabel: 'Save Magna Carta',
-  },
-  editMagnaCarta: {
-    eyebrow: 'Policy Reference',
-    title: 'Edit Magna Carta Item',
-    subtitle: 'Update the image card details and publishing status.',
-    submitLabel: 'Update Magna Carta',
-  },
 }
 
 function initialsFromName(name) {
@@ -295,7 +283,6 @@ export default function ActionModal({
   onMemberImportSubmit,
   onUserSubmit,
   onMemorandumSubmit,
-  onMagnaCartaSubmit,
   newsForm,
   videoForm,
   eventForm,
@@ -304,7 +291,6 @@ export default function ActionModal({
   memberImportForm,
   userForm,
   memorandumForm,
-  magnaForm,
   onNewsFieldChange,
   onVideoFieldChange,
   onEventFieldChange,
@@ -313,7 +299,6 @@ export default function ActionModal({
   onMemberImportFieldChange,
   onUserFieldChange,
   onMemorandumFieldChange,
-  onMagnaFieldChange,
   submitting,
   regions = [],
   regionClubMap = {},
@@ -326,7 +311,6 @@ export default function ActionModal({
   const isEditingVideo = mode === 'editVideo'
   const isEditingUser = mode === 'editUser'
   const isEditingEvent = mode === 'editEvent'
-  const isEditingMagna = mode === 'editMagnaCarta'
   const currentRegion = String(memberForm?.region || '').trim()
   const currentClub = String(memberForm?.club || '').trim()
   const regionOptions = sortLabels(Array.from(new Set([...regions, currentRegion].filter(Boolean))))
@@ -967,91 +951,6 @@ export default function ActionModal({
               <button type="submit" className="admin-primary-button" disabled={submitting}>
                 <i
                   className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-file-arrow-up'}`}
-                  aria-hidden="true"
-                ></i>
-                {submitting ? 'Saving...' : copy.submitLabel}
-              </button>
-            </div>
-          </form>
-        )}
-
-        {(mode === 'magnaCarta' || mode === 'editMagnaCarta') && (
-          <form onSubmit={onMagnaCartaSubmit} className="admin-modal-form">
-            {magnaForm?.imageUrl ? (
-              <div className="admin-modal-note media">
-                <span>Current Magna Carta image</span>
-                <div className="admin-modal-media">
-                  <img src={magnaForm.imageUrl} alt={magnaForm?.title || 'Magna Carta image'} />
-                  <div>
-                    <strong>{magnaForm?.imageFilename || 'Existing uploaded image'}</strong>
-                    <small>Upload a new image to replace this card.</small>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="admin-modal-grid">
-              {isEditingMagna ? (
-                <Field label="Item ID">
-                  <input type="text" value={magnaForm?.id || ''} readOnly />
-                </Field>
-              ) : null}
-
-              <Field label="Title" fullWidth>
-                <input
-                  type="text"
-                  placeholder="Magna Carta title"
-                  value={magnaForm?.title || ''}
-                  onChange={(event) => onMagnaFieldChange('title', event.target.value)}
-                  required
-                />
-              </Field>
-
-              <Field label="Subtitle" fullWidth>
-                <input
-                  type="text"
-                  placeholder="Optional subtitle"
-                  value={magnaForm?.subtitle || ''}
-                  onChange={(event) => onMagnaFieldChange('subtitle', event.target.value)}
-                />
-              </Field>
-
-              <Field label="Status">
-                <select
-                  value={magnaForm?.status || 'Draft'}
-                  onChange={(event) => onMagnaFieldChange('status', event.target.value)}
-                >
-                  <option value="Draft">Draft</option>
-                  <option value="Published">Published</option>
-                </select>
-              </Field>
-
-              <Field label="Image" helper="Use this as the front/back book card image.">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => onMagnaFieldChange('image', event.target.files?.[0] || null)}
-                />
-              </Field>
-
-              <Field label="Description" fullWidth>
-                <textarea
-                  placeholder="Item description"
-                  value={magnaForm?.description || ''}
-                  onChange={(event) => onMagnaFieldChange('description', event.target.value)}
-                  rows={6}
-                  required
-                />
-              </Field>
-            </div>
-
-            <div className="admin-modal-actions">
-              <button type="button" className="admin-secondary-button" onClick={onClose}>
-                Cancel
-              </button>
-              <button type="submit" className="admin-primary-button" disabled={submitting}>
-                <i
-                  className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-floppy-disk'}`}
                   aria-hidden="true"
                 ></i>
                 {submitting ? 'Saving...' : copy.submitLabel}

@@ -190,6 +190,7 @@ function EventMedia({ event, variant = 'card' }) {
       uniqueStrings([
         event?.mediaUrl,
         publicMediaUrl('event_media', event?.mediaFilename),
+        publicMediaUrl('media', event?.mediaFilename),
       ]),
     [event?.mediaFilename, event?.mediaUrl],
   )

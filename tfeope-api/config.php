@@ -14,6 +14,7 @@ if (!function_exists('api_config')) {
         }
 
         $config = [
+            'workspace_storage_root' => 'C:/Users/MagicCube/Documents/GitHub/eagles-web-renovation/tfeope-api/storage',
             'db' => [
                 'host' => 'localhost',
                 'user' => 'root',
@@ -23,8 +24,8 @@ if (!function_exists('api_config')) {
                 'charset' => 'utf8mb4',
             ],
             'base_url' => 'http://localhost/tfeope-api',
-            'uploads_root' => __DIR__ . '/uploads',
-            'legacy_storage_root' => __DIR__ . '/storage',
+            'uploads_root' => 'C:/Users/MagicCube/Documents/GitHub/eagles-web-renovation/tfeope-api/storage/uploads',
+            'legacy_storage_root' => 'C:/Users/MagicCube/Documents/GitHub/eagles-web-renovation/tfeope-api/storage',
             'allowed_origins' => [
                 'http://localhost',
                 'http://127.0.0.1',

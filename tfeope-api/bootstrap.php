@@ -1791,3 +1791,4 @@ if (!function_exists('api_magna_carta_list')) {
         }, $rows);
     }
 }
+

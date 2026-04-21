@@ -800,89 +800,57 @@ export function MemorandumPage({
   )
 }
 
-export function MagnaCartaPage({
-  items = [],
-  query = '',
-  onCreateMagnaCarta,
-  onEditMagnaCarta,
-}) {
+export function MagnaCartaPage({ items = [], query = '' }) {
   const filteredItems = items.filter((item) => matchesQuery(item, query))
 
   return (
     <SectionCard
       eyebrow="Policy Reference"
       title="Magna Carta"
-      subtitle={`${filteredItems.length} image card(s) ready for front/back style presentation.`}
+      subtitle={`${filteredItems.length} policy item(s) available for quick reference.`}
       metrics={[
         {
           label: 'Entries',
           value: filteredItems.length,
-          helper: 'Image cards',
+          helper: 'Searchable records',
           tone: 'info',
         },
         {
-          label: 'Published',
-          value: filteredItems.filter((item) => String(item?.status || '').toLowerCase() === 'published').length,
-          helper: 'Visible to public page',
+          label: 'With descriptions',
+          value: filteredItems.filter((item) => item?.description || item?.content).length,
+          helper: 'Documented policy notes',
           tone: 'positive',
         },
         {
-          label: 'Draft',
-          value: filteredItems.filter((item) => String(item?.status || '').toLowerCase() !== 'published').length,
-          helper: 'Needs publishing',
+          label: 'Structured titles',
+          value: filteredItems.filter((item) => item?.title || item?.heading).length,
+          helper: 'Named content blocks',
           tone: 'warm',
         },
       ]}
-      actions={(
-        <button type="button" className="admin-primary-button" onClick={onCreateMagnaCarta}>
-          <i className="fas fa-plus" aria-hidden="true"></i>
-          Create Magna Carta
-        </button>
-      )}
     >
-      {!filteredItems.length ? (
-        <EmptyState label="Magna Carta items" icon="fa-book" />
-      ) : (
-        <div className="content-grid">
-          {filteredItems.map((item, index) => {
-            const title = item?.title || item?.heading || `Magna Carta ${index + 1}`
-            const imageUrl = String(item?.imageUrl || '').trim()
+      <SimpleGrid
+        items={filteredItems}
+        emptyLabel="Magna Carta items"
+        emptyIcon="fa-book"
+        renderItem={(item) => (
+          <>
+            <div className="content-item-topline">
+              <StatusBadge value="Reference" />
+            </div>
 
-            return (
-              <article key={item?.id || `magna-${index}`} className="content-item-card">
-                <div className="content-item-topline">
-                  <StatusBadge value={item?.status || 'Draft'} />
-                </div>
+            <h3>{item?.title || item?.heading || 'Untitled item'}</h3>
+            <p className="content-item-text">
+              {item?.description || item?.content || 'No details available.'}
+            </p>
 
-                <h3>{title}</h3>
-
-                {imageUrl ? (
-                  <img src={imageUrl} alt={title} className="content-item-image" />
-                ) : (
-                  <div className="content-item-image-placeholder">
-                    <i className="fas fa-book-open" aria-hidden="true"></i>
-                  </div>
-                )}
-
-                <p className="content-item-text">
-                  {item?.description || item?.content || 'No details available.'}
-                </p>
-
-                <div className="content-item-actions">
-                  <button
-                    type="button"
-                    className="admin-secondary-button"
-                    onClick={() => onEditMagnaCarta?.(item)}
-                  >
-                    <i className="fas fa-pen-to-square" aria-hidden="true"></i>
-                    Edit
-                  </button>
-                </div>
-              </article>
-            )
-          })}
-        </div>
-      )}
+            <div className="content-item-tags">
+              <DetailTag icon="fa-book-open-reader">Policy reference</DetailTag>
+              <DetailTag icon="fa-layer-group">Static content block</DetailTag>
+            </div>
+          </>
+        )}
+      />
     </SectionCard>
   )
 }
