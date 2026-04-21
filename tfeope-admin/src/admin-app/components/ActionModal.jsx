@@ -83,6 +83,18 @@ const modalCopy = {
     subtitle: 'Adjust memorandum details and add more supporting pages when needed.',
     submitLabel: 'Update Memorandum',
   },
+  magnaCarta: {
+    eyebrow: 'Policy Reference',
+    title: 'Create Magna Carta',
+    subtitle: 'Create a Magna Carta entry with status and optional cover image.',
+    submitLabel: 'Save Magna Carta',
+  },
+  editMagnaCarta: {
+    eyebrow: 'Policy Reference',
+    title: 'Edit Magna Carta',
+    subtitle: 'Update title, content, status, and cover image for this policy entry.',
+    submitLabel: 'Update Magna Carta',
+  },
 }
 
 function initialsFromName(name) {
@@ -283,6 +295,7 @@ export default function ActionModal({
   onMemberImportSubmit,
   onUserSubmit,
   onMemorandumSubmit,
+  onMagnaCartaSubmit,
   newsForm,
   videoForm,
   eventForm,
@@ -291,6 +304,7 @@ export default function ActionModal({
   memberImportForm,
   userForm,
   memorandumForm,
+  magnaCartaForm,
   onNewsFieldChange,
   onVideoFieldChange,
   onEventFieldChange,
@@ -299,6 +313,7 @@ export default function ActionModal({
   onMemberImportFieldChange,
   onUserFieldChange,
   onMemorandumFieldChange,
+  onMagnaCartaFieldChange,
   submitting,
   regions = [],
   regionClubMap = {},
@@ -951,6 +966,85 @@ export default function ActionModal({
               <button type="submit" className="admin-primary-button" disabled={submitting}>
                 <i
                   className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-file-arrow-up'}`}
+                  aria-hidden="true"
+                ></i>
+                {submitting ? 'Saving...' : copy.submitLabel}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {(mode === 'magnaCarta' || mode === 'editMagnaCarta') && (
+          <form onSubmit={onMagnaCartaSubmit} className="admin-modal-form">
+            {magnaCartaForm?.imageUrl ? (
+              <div className="admin-modal-note media">
+                <span>Current image</span>
+                <div className="admin-modal-media">
+                  <img src={magnaCartaForm.imageUrl} alt={magnaCartaForm?.title || 'Magna Carta image'} />
+                  <div>
+                    <strong>{magnaCartaForm?.imageFilename || 'Existing uploaded image'}</strong>
+                    <small>Uploading a new file will replace the current image.</small>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="admin-modal-grid">
+              <Field label="Title" fullWidth>
+                <input
+                  type="text"
+                  placeholder="Magna Carta title"
+                  value={magnaCartaForm?.title || ''}
+                  onChange={(event) => onMagnaCartaFieldChange('title', event.target.value)}
+                  required
+                />
+              </Field>
+
+              <Field label="Subtitle">
+                <input
+                  type="text"
+                  placeholder="Optional subtitle"
+                  value={magnaCartaForm?.subtitle || ''}
+                  onChange={(event) => onMagnaCartaFieldChange('subtitle', event.target.value)}
+                />
+              </Field>
+
+              <Field label="Status">
+                <select
+                  value={magnaCartaForm?.status || 'Draft'}
+                  onChange={(event) => onMagnaCartaFieldChange('status', event.target.value)}
+                >
+                  <option value="Draft">Draft</option>
+                  <option value="Published">Published</option>
+                </select>
+              </Field>
+
+              <Field label="Image" helper="Optional cover image for this policy entry.">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => onMagnaCartaFieldChange('image', event.target.files?.[0] || null)}
+                />
+              </Field>
+
+              <Field label="Description" fullWidth>
+                <textarea
+                  placeholder="Policy description/content"
+                  value={magnaCartaForm?.description || ''}
+                  onChange={(event) => onMagnaCartaFieldChange('description', event.target.value)}
+                  rows={6}
+                  required
+                />
+              </Field>
+            </div>
+
+            <div className="admin-modal-actions">
+              <button type="button" className="admin-secondary-button" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="submit" className="admin-primary-button" disabled={submitting}>
+                <i
+                  className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-floppy-disk'}`}
                   aria-hidden="true"
                 ></i>
                 {submitting ? 'Saving...' : copy.submitLabel}

@@ -24,6 +24,9 @@ import {
   ADMIN_MEMORANDUM_CREATE_ENDPOINT,
   ADMIN_MEMORANDUM_DELETE_ENDPOINT,
   ADMIN_MEMORANDUM_UPDATE_ENDPOINT,
+  ADMIN_MAGNA_CARTA_ENDPOINT,
+  ADMIN_MAGNA_CARTA_CREATE_ENDPOINT,
+  ADMIN_MAGNA_CARTA_UPDATE_ENDPOINT,
   ADMIN_NEWS_ENDPOINT,
   ADMIN_NEWS_CREATE_ENDPOINT,
   ADMIN_NEWS_UPDATE_ENDPOINT,
@@ -38,7 +41,6 @@ import {
   ADMIN_VIDEOS_CREATE_ENDPOINT,
   ADMIN_VIDEOS_UPDATE_ENDPOINT,
   APPOINTED_ENDPOINT,
-  MAGNA_CARTA_ENDPOINT,
 } from './config'
 import {
   emptyCollections,
@@ -81,7 +83,7 @@ const collectionLoaders = [
   { key: 'officers', label: 'Officers', endpoint: ADMIN_OFFICERS_ENDPOINT },
   { key: 'governors', label: 'Governors', endpoint: ADMIN_GOVERNORS_ENDPOINT },
   { key: 'appointed', label: 'Appointed Officers', endpoint: APPOINTED_ENDPOINT },
-  { key: 'magnaCarta', label: 'Magna Carta', endpoint: MAGNA_CARTA_ENDPOINT },
+  { key: 'magnaCarta', label: 'Magna Carta', endpoint: ADMIN_MAGNA_CARTA_ENDPOINT },
 ]
 
 const pageToCollectionKey = {
@@ -404,6 +406,16 @@ function App() {
     pages: [],
     currentPages: [],
   })
+  const [magnaCartaComposer, setMagnaCartaComposer] = useState({
+    id: '',
+    title: '',
+    subtitle: '',
+    description: '',
+    status: 'Draft',
+    image: null,
+    imageUrl: '',
+    imageFilename: '',
+  })
   const [userComposer, setUserComposer] = useState({
     name: '',
     username: '',
@@ -498,6 +510,19 @@ function App() {
       status: 'Draft',
       pages: [],
       currentPages: [],
+    })
+  }
+
+  function resetMagnaCartaComposer() {
+    setMagnaCartaComposer({
+      id: '',
+      title: '',
+      subtitle: '',
+      description: '',
+      status: 'Draft',
+      image: null,
+      imageUrl: '',
+      imageFilename: '',
     })
   }
 
@@ -907,6 +932,10 @@ function App() {
       resetMemorandumComposer()
     }
 
+    if (mode === 'magnaCarta') {
+      resetMagnaCartaComposer()
+    }
+
     if (mode === 'user') {
       resetUserComposer()
     }
@@ -974,6 +1003,20 @@ function App() {
       currentPages: Array.isArray(item?.pages) ? item.pages : [],
     })
     setActionModal('editMemorandum')
+  }
+
+  function openMagnaCartaEditor(item) {
+    setMagnaCartaComposer({
+      id: String(item?.id || '').trim(),
+      title: String(item?.title || '').trim(),
+      subtitle: String(item?.subtitle || '').trim(),
+      description: String(item?.description || item?.content || '').trim(),
+      status: String(item?.status || (item?.isActive ? 'Published' : 'Draft')).trim() || 'Draft',
+      image: null,
+      imageUrl: String(item?.imageUrl || '').trim(),
+      imageFilename: String(item?.imageFilename || '').trim(),
+    })
+    setActionModal('editMagnaCarta')
   }
 
   function openOfficerEditor(item) {
@@ -1065,6 +1108,10 @@ function App() {
 
   function updateMemorandumComposer(field, value) {
     setMemorandumComposer((current) => ({ ...current, [field]: value }))
+  }
+
+  function updateMagnaCartaComposer(field, value) {
+    setMagnaCartaComposer((current) => ({ ...current, [field]: value }))
   }
 
   function updateUserComposer(field, value) {
@@ -1660,6 +1707,52 @@ function App() {
     }
   }
 
+  async function handleSaveMagnaCarta(event) {
+    event.preventDefault()
+
+    try {
+      setActionBusy(true)
+      setError('')
+      setNotice('')
+
+      const formData = new FormData()
+      formData.append('title', magnaCartaComposer.title)
+      formData.append('subtitle', magnaCartaComposer.subtitle)
+      formData.append('description', magnaCartaComposer.description)
+      formData.append('status', magnaCartaComposer.status)
+
+      if (magnaCartaComposer.id) {
+        formData.append('id', magnaCartaComposer.id)
+      }
+
+      if (magnaCartaComposer.image) {
+        formData.append('image', magnaCartaComposer.image)
+      }
+
+      const endpoint = magnaCartaComposer.id
+        ? ADMIN_MAGNA_CARTA_UPDATE_ENDPOINT
+        : ADMIN_MAGNA_CARTA_CREATE_ENDPOINT
+
+      await requestJson(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData,
+      })
+
+      await runAdminRefresh({ silent: true })
+      setActivePage('magnaCarta')
+      setOpenGroups((current) => ({ ...current, content: true }))
+      setNotice(magnaCartaComposer.id ? 'Magna Carta updated successfully.' : 'Magna Carta created successfully.')
+      closeActionModal(true)
+      resetMagnaCartaComposer()
+    } catch (saveError) {
+      setError(saveError.message || 'Unable to save Magna Carta item.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
   const query = ''
   const activeCollectionError = moduleErrors[pageToCollectionKey[activePage]]
   const bannerMessage = error || notice
@@ -1770,7 +1863,14 @@ function App() {
           />
         )
       case 'magnaCarta':
-        return <MagnaCartaPage items={collections.magnaCarta} query={query} />
+        return (
+          <MagnaCartaPage
+            items={collections.magnaCarta}
+            query={query}
+            onCreateMagnaCarta={() => openActionModal('magnaCarta')}
+            onEditMagnaCarta={openMagnaCartaEditor}
+          />
+        )
       case 'officers':
         return (
           <OfficersPage
@@ -2050,6 +2150,7 @@ function App() {
         onMemberImportSubmit={handleImportMembers}
         onUserSubmit={handleCreateUser}
         onMemorandumSubmit={handleSaveMemorandum}
+        onMagnaCartaSubmit={handleSaveMagnaCarta}
         newsForm={newsComposer}
         videoForm={videoComposer}
         eventForm={eventComposer}
@@ -2058,6 +2159,7 @@ function App() {
         memberImportForm={memberImportForm}
         userForm={userComposer}
         memorandumForm={memorandumComposer}
+        magnaCartaForm={magnaCartaComposer}
         onNewsFieldChange={updateNewsComposer}
         onVideoFieldChange={updateVideoComposer}
         onEventFieldChange={updateEventComposer}
@@ -2066,6 +2168,7 @@ function App() {
         onMemberImportFieldChange={updateMemberImportForm}
         onUserFieldChange={updateUserComposer}
         onMemorandumFieldChange={updateMemorandumComposer}
+        onMagnaCartaFieldChange={updateMagnaCartaComposer}
         submitting={actionBusy}
         regions={regions}
         regionClubMap={regionClubMap}

@@ -26,7 +26,8 @@ const defaultOrigin = import.meta.env.VITE_API_ORIGIN
     : PROD_API_ORIGIN)
 
 const API_ORIGIN = normalizeOrigin(defaultOrigin)
-const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH || '/tfeope-api').replace(/\/$/, '')
+const defaultBasePath = import.meta.env.DEV ? '/tfeope-api' : ''
+const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH ?? defaultBasePath).replace(/\/$/, '')
 
 function apiUrl(pathname) {
   const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`
@@ -70,6 +71,9 @@ export const ADMIN_MEMORANDUM_ENDPOINT = apiUrl('/v1/admin/memorandum/get_all.ph
 export const ADMIN_MEMORANDUM_CREATE_ENDPOINT = apiUrl('/v1/admin/memorandum/create.php')
 export const ADMIN_MEMORANDUM_UPDATE_ENDPOINT = apiUrl('/v1/admin/memorandum/update.php')
 export const ADMIN_MEMORANDUM_DELETE_ENDPOINT = apiUrl('/v1/admin/memorandum/delete.php')
+export const ADMIN_MAGNA_CARTA_ENDPOINT = apiUrl('/v1/admin/magna_carta/get_all.php')
+export const ADMIN_MAGNA_CARTA_CREATE_ENDPOINT = apiUrl('/v1/admin/magna_carta/create.php')
+export const ADMIN_MAGNA_CARTA_UPDATE_ENDPOINT = apiUrl('/v1/admin/magna_carta/update.php')
 export const ADMIN_OFFICERS_ENDPOINT = apiUrl('/v1/admin/officers/get_all.php')
 export const ADMIN_OFFICERS_UPDATE_ENDPOINT = apiUrl('/v1/admin/officers/update.php')
 export const ADMIN_GOVERNORS_ENDPOINT = apiUrl('/v1/admin/governors/get_all.php')

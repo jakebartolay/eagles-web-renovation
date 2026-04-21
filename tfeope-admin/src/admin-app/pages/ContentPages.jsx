@@ -800,34 +800,46 @@ export function MemorandumPage({
   )
 }
 
-export function MagnaCartaPage({ items = [], query = '' }) {
+export function MagnaCartaPage({
+  items = [],
+  query = '',
+  onCreateMagnaCarta,
+  onEditMagnaCarta,
+}) {
   const filteredItems = items.filter((item) => matchesQuery(item, query))
+  const publishedCount = filteredItems.filter((item) => String(item?.status || '').toLowerCase().includes('publish')).length
 
   return (
     <SectionCard
       eyebrow="Policy Reference"
       title="Magna Carta"
-      subtitle={`${filteredItems.length} policy item(s) available for quick reference.`}
+      subtitle={`${filteredItems.length} policy item(s) available for management.`}
       metrics={[
         {
-          label: 'Entries',
-          value: filteredItems.length,
-          helper: 'Searchable records',
-          tone: 'info',
-        },
-        {
-          label: 'With descriptions',
-          value: filteredItems.filter((item) => item?.description || item?.content).length,
-          helper: 'Documented policy notes',
+          label: 'Published',
+          value: publishedCount,
+          helper: 'Visible policies',
           tone: 'positive',
         },
         {
-          label: 'Structured titles',
-          value: filteredItems.filter((item) => item?.title || item?.heading).length,
-          helper: 'Named content blocks',
+          label: 'Drafts',
+          value: Math.max(0, filteredItems.length - publishedCount),
+          helper: 'Pending policies',
           tone: 'warm',
         },
+        {
+          label: 'With images',
+          value: filteredItems.filter((item) => String(item?.imageUrl || '').trim() !== '').length,
+          helper: 'Uploaded covers',
+          tone: 'info',
+        },
       ]}
+      actions={(
+        <button type="button" className="admin-primary-button" onClick={onCreateMagnaCarta}>
+          <i className="fas fa-plus" aria-hidden="true"></i>
+          Create Magna Carta
+        </button>
+      )}
     >
       <SimpleGrid
         items={filteredItems}
@@ -835,18 +847,33 @@ export function MagnaCartaPage({ items = [], query = '' }) {
         emptyIcon="fa-book"
         renderItem={(item) => (
           <>
-            <div className="content-item-topline">
-              <StatusBadge value="Reference" />
+            <div className="content-item-topline magna-carta-card__topline">
+              <StatusBadge value={item?.status || (item?.isActive ? 'Published' : 'Draft')} />
+              <button
+                type="button"
+                className="admin-secondary-button"
+                onClick={() => onEditMagnaCarta?.(item)}
+              >
+                <i className="fas fa-pen-to-square" aria-hidden="true"></i>
+                Edit
+              </button>
             </div>
 
+            <CardMedia
+              src={String(item?.imageUrl || '').trim()}
+              alt={item?.title || item?.heading || 'Magna Carta image'}
+              icon="fa-book"
+            />
+
             <h3>{item?.title || item?.heading || 'Untitled item'}</h3>
+            {item?.subtitle ? <p className="content-item-text">{item.subtitle}</p> : null}
             <p className="content-item-text">
               {item?.description || item?.content || 'No details available.'}
             </p>
 
             <div className="content-item-tags">
               <DetailTag icon="fa-book-open-reader">Policy reference</DetailTag>
-              <DetailTag icon="fa-layer-group">Static content block</DetailTag>
+              <DetailTag icon="fa-clock">Updated: {formatDateOnly(item?.updatedAt || item?.updated_at || item?.createdAt || item?.created_at)}</DetailTag>
             </div>
           </>
         )}

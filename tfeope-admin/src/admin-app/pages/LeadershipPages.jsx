@@ -378,6 +378,7 @@ export function GovernorsPage({ items = [], query = '' }) {
 }
 
 export function AppointedPage({ items = [], query = '' }) {
+  const [currentPage, setCurrentPage] = useState(1)
   const [selectedRegion, setSelectedRegion] = useState('all')
   const [selectedCommittee, setSelectedCommittee] = useState('all')
   const filteredItems = items.filter((item) => matchesQuery(item, query))
@@ -394,21 +395,35 @@ export function AppointedPage({ items = [], query = '' }) {
         .filter(Boolean),
     ),
   ).sort((a, b) => a.localeCompare(b))
-  const visibleItems = selectedCommittee === 'all'
+  const regionCommitteeFilteredItems = selectedCommittee === 'all'
     ? regionFilteredItems
     : regionFilteredItems.filter((item) => {
       const committee = String(item?.committee || item?.club || '').trim()
       return committee === selectedCommittee
     })
+  const pageSize = 10
+  const totalPages = Math.max(1, Math.ceil(regionCommitteeFilteredItems.length / pageSize))
+  const pageStart = (currentPage - 1) * pageSize
+  const visibleItems = regionCommitteeFilteredItems.slice(pageStart, pageStart + pageSize)
+  const displayStart = regionCommitteeFilteredItems.length ? pageStart + 1 : 0
+  const displayEnd = regionCommitteeFilteredItems.length
+    ? Math.min(pageStart + pageSize, regionCommitteeFilteredItems.length)
+    : 0
 
   useEffect(() => {
     setSelectedRegion('all')
     setSelectedCommittee('all')
+    setCurrentPage(1)
   }, [query])
 
   useEffect(() => {
     setSelectedCommittee('all')
+    setCurrentPage(1)
   }, [selectedRegion])
+
+  useEffect(() => {
+    setCurrentPage((page) => (page > totalPages ? totalPages : page))
+  }, [totalPages])
 
   return (
     <section className="content-section-card">
@@ -478,41 +493,87 @@ export function AppointedPage({ items = [], query = '' }) {
                     ))}
                   </select>
                 </div>
-                <p className="members-toolbar__info">{visibleItems.length} record(s)</p>
+                <p className="members-toolbar__info">{regionCommitteeFilteredItems.length} record(s)</p>
               </div>
             </div>
 
-            {!visibleItems.length ? (
+            {!regionCommitteeFilteredItems.length ? (
               <div className="content-empty-state">
                 <i className="fas fa-filter-circle-xmark" aria-hidden="true"></i>
                 <p>No appointed officers match your dropdown filters.</p>
               </div>
             ) : (
-              <div className="content-grid">
-                {visibleItems.map((item, index) => {
-                  const name = personName(item, 'Unnamed appointed officer')
-                  const position = item?.position || item?.designation || 'No position available.'
-                  const club = item?.club || item?.committee || 'Club not set'
-                  const region = item?.region || 'Region not set'
-                  const photoUrl = String(item?.photoUrl || item?.imageUrl || '').trim()
+              <div className="appointed-table-wrap">
+                <table className="appointed-table">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Officer</th>
+                      <th>Position</th>
+                      <th>Club / Committee</th>
+                      <th>Region</th>
+                      <th>Updated</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleItems.map((item, index) => {
+                      const name = personName(item, 'Unnamed appointed officer')
+                      const position = item?.position || item?.designation || 'No position available.'
+                      const club = item?.club || item?.committee || 'Club not set'
+                      const region = item?.region || 'Region not set'
+                      const photoUrl = String(item?.photoUrl || item?.imageUrl || '').trim()
 
-                  return (
-                    <article key={item?.id || `appointed-${index}`} className="content-item-card entity-card leadership-card">
-                      <div className="entity-card__header">
-                        <Avatar name={name} src={photoUrl} />
-                        <div className="entity-card__heading">
-                          <strong>{name}</strong>
-                          <small>{position}</small>
-                        </div>
-                      </div>
-                      <div className="content-item-tags">
-                        <DetailPill icon="fa-users">Club: {club}</DetailPill>
-                        <DetailPill icon="fa-location-dot">Region: {region}</DetailPill>
-                        <DetailPill icon="fa-clock">Updated: {formatDate(item?.updatedAt || item?.updated_at || item?.createdAt || item?.created_at)}</DetailPill>
-                      </div>
-                    </article>
-                  )
-                })}
+                      return (
+                        <tr key={item?.id || `appointed-${pageStart + index}`}>
+                          <td data-label="ID">{item?.id || 'N/A'}</td>
+                          <td data-label="Officer">
+                            <div className="appointed-table__identity">
+                              <Avatar name={name} src={photoUrl} />
+                              <div className="appointed-table__identity-copy">
+                                <strong>{name}</strong>
+                              </div>
+                            </div>
+                          </td>
+                          <td data-label="Position">
+                            <p className="appointed-table__position">{position}</p>
+                          </td>
+                          <td data-label="Club / Committee">{club}</td>
+                          <td data-label="Region">{region}</td>
+                          <td data-label="Updated">{formatDate(item?.updatedAt || item?.updated_at || item?.createdAt || item?.created_at)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+
+                <div className="table-pagination">
+                  <div className="table-pagination__slot table-pagination__slot--left">
+                    <p className="table-pagination__info">
+                      Showing {displayStart}-{displayEnd} of {regionCommitteeFilteredItems.length}
+                    </p>
+                  </div>
+                  <div className="table-pagination__slot table-pagination__slot--center">
+                    <p className="table-pagination__info">10 rows per page</p>
+                  </div>
+                  <div className="table-pagination__slot table-pagination__slot--right table-pagination__actions">
+                    <button
+                      type="button"
+                      className="admin-secondary-button table-pagination__button"
+                      onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-secondary-button table-pagination__button"
+                      onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </>
