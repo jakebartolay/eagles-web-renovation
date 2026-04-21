@@ -1,56 +1,36 @@
 import adminBackgroundUrl from './assets/admin-bg.png'
 import adminLogoUrl from './assets/eagles.png'
 
-const DEFAULT_PROD_API_URL = 'https://api.tfoepe-inc.com.ph/tfeope-api'
+const PROD_API_ORIGIN = 'https://api.tfoepe-inc.com.ph'
 
-function trimTrailingSlash(value) {
-  return String(value || '').trim().replace(/\/$/, '')
-}
+function normalizeOrigin(origin) {
+  const trimmed = String(origin || '').trim().replace(/\/$/, '')
+  if (!trimmed) {
+    return trimmed
+  }
 
-function normalizeApiRoot(candidate) {
-  const fallback = trimTrailingSlash(DEFAULT_PROD_API_URL)
-  const normalizedCandidate = trimTrailingSlash(candidate)
-  const resolved = normalizedCandidate || fallback
-
-  try {
-    const url = new URL(resolved)
-    const hostname = String(url.hostname || '').toLowerCase()
-    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1'
-
-    if (!import.meta.env.DEV && url.protocol === 'http:' && !isLocal) {
-      url.protocol = 'https:'
+  // Force HTTPS for non-local environments.
+  if (!import.meta.env.DEV && /^http:\/\//i.test(trimmed)) {
+    const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(trimmed)
+    if (!isLocalhost) {
+      return trimmed.replace(/^http:\/\//i, 'https://')
     }
-
-    return trimTrailingSlash(url.toString())
-  } catch {
-    return fallback
   }
+
+  return trimmed
 }
 
-function resolveApiRoot() {
-  const apiUrl = trimTrailingSlash(import.meta.env.VITE_API_URL)
-  if (apiUrl) {
-    return normalizeApiRoot(apiUrl)
-  }
+const defaultOrigin = import.meta.env.VITE_API_ORIGIN
+  || (import.meta.env.DEV
+    ? 'http://localhost'
+    : PROD_API_ORIGIN)
 
-  const origin = trimTrailingSlash(import.meta.env.VITE_API_ORIGIN)
-  const basePath = trimTrailingSlash(import.meta.env.VITE_API_BASE_PATH || '/tfeope-api')
-  if (origin) {
-    return normalizeApiRoot(`${origin}${basePath}`)
-  }
-
-  if (import.meta.env.DEV) {
-    return normalizeApiRoot('http://localhost/tfeope-api')
-  }
-
-  return normalizeApiRoot(DEFAULT_PROD_API_URL)
-}
-
-const API_ROOT = resolveApiRoot()
+const API_ORIGIN = normalizeOrigin(defaultOrigin)
+const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH || '/tfeope-api').replace(/\/$/, '')
 
 function apiUrl(pathname) {
   const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`
-  return `${API_ROOT}${normalizedPath}`
+  return `${API_ORIGIN}${API_BASE_PATH}${normalizedPath}`
 }
 
 export const ADMIN_BRANDING = {
@@ -59,7 +39,7 @@ export const ADMIN_BRANDING = {
   title: 'TFEOPE Admin',
 }
 
-export const ADMIN_API_BASE_URL = API_ROOT
+export const ADMIN_API_BASE_URL = `${API_ORIGIN}${API_BASE_PATH}`
 
 export const ADMIN_SESSION_ENDPOINT = apiUrl('/api/admin/session.php')
 export const ADMIN_LOGIN_ENDPOINT = apiUrl('/api/admin/login.php')

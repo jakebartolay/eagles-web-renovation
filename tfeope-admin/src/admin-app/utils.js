@@ -36,19 +36,19 @@ export async function readJson(res) {
 
   if (!res.ok) {
     const fallbackMessage = res.status === 400
-      ? 'Invalid request. Please review the form and try again.'
+      ? 'Invalid request. Please review your input and try again.'
       : res.status === 401
-        ? 'Your session expired. Please sign in again.'
+        ? 'Your session has expired. Please sign in again.'
         : res.status === 403
           ? 'You do not have permission to perform this action.'
           : res.status === 404
             ? 'Service endpoint not found. Please contact support.'
-            : res.status === 413
-              ? 'Upload is too large. Please choose a smaller file.'
-              : res.status === 422
-                ? 'Some fields are invalid. Please review your input.'
-                : res.status === 429
-                  ? 'Too many requests. Please wait a moment and try again.'
+            : res.status === 405
+              ? 'This action is not allowed on the server.'
+              : res.status === 413
+                ? 'Upload is too large. Please choose a smaller file.'
+                : res.status === 422
+                  ? 'Some fields are invalid. Please review and try again.'
                   : res.status >= 500
                     ? 'Server unavailable right now. Please try again later.'
                     : raw.includes('POST Content-Length')
@@ -75,9 +75,9 @@ export function normalizeRequestError(error, fallbackMessage = 'Something went w
     return createRequestError(
       offline
         ? 'No internet connection. Please check your network and try again.'
-        : 'Unable to reach the API service. Please check HTTPS/CORS configuration and try again.',
+        : 'Could not reach the API server. Please try again later.',
       {
-        code: offline ? 'OFFLINE' : 'NETWORK_OR_CORS_ERROR',
+        code: offline ? 'OFFLINE' : 'SERVER_UNAVAILABLE',
         cause: error,
       },
     )
