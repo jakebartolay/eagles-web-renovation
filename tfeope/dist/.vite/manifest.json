@@ -1,0 +1,107 @@
+{
+  "C:/xampp/htdocs/tfeope/src/theme/appt_ofc.css": {
+    "file": "assets/officers-DKnIKC6j.css",
+    "src": "C:/xampp/htdocs/tfeope/src/theme/appt_ofc.css"
+  },
+  "C:/xampp/htdocs/tfeope/src/theme/boft.css": {
+    "file": "assets/officers-DKnIKC6j.css",
+    "src": "C:/xampp/htdocs/tfeope/src/theme/appt_ofc.css"
+  },
+  "C:/xampp/htdocs/tfeope/src/theme/governors.css": {
+    "file": "assets/officers-DKnIKC6j.css",
+    "src": "C:/xampp/htdocs/tfeope/src/theme/appt_ofc.css"
+  },
+  "C:/xampp/htdocs/tfeope/src/theme/magna-carta.css": {
+    "file": "assets/magna-carta-Bb9h5-EO.css",
+    "src": "C:/xampp/htdocs/tfeope/src/theme/magna-carta.css"
+  },
+  "C:/xampp/htdocs/tfeope/src/theme/member.css": {
+    "file": "assets/officers-DKnIKC6j.css",
+    "src": "C:/xampp/htdocs/tfeope/src/theme/appt_ofc.css"
+  },
+  "C:/xampp/htdocs/tfeope/src/theme/national_comm.css": {
+    "file": "assets/officers-DKnIKC6j.css",
+    "src": "C:/xampp/htdocs/tfeope/src/theme/appt_ofc.css"
+  },
+  "C:/xampp/htdocs/tfeope/src/theme/national_exec.css": {
+    "file": "assets/officers-DKnIKC6j.css",
+    "src": "C:/xampp/htdocs/tfeope/src/theme/appt_ofc.css"
+  },
+  "C:/xampp/htdocs/tfeope/src/theme/officers.css": {
+    "file": "assets/officers-DKnIKC6j.css",
+    "src": "C:/xampp/htdocs/tfeope/src/theme/appt_ofc.css"
+  },
+  "index.html": {
+    "file": "assets/index-D2s_H1yF.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "css": [
+      "assets/index-DQuXs0M9.css"
+    ],
+    "assets": [
+      "assets/logo-BJXcv5SY.png",
+      "assets/eagles alpha systems-DzTjmL8X.png",
+      "assets/homebg-B7wpbo4d.jpg",
+      "assets/about_us-CbN2GIMk.jpg",
+      "assets/aboutHeader-CfkfMm4C.png",
+      "assets/news-DUBRnV1m.png",
+      "assets/placeholder-B7VeJ5xi.png",
+      "assets/events-CqybEjEp.png",
+      "assets/1-wQSmvdYv.jpg",
+      "assets/2-CgJE79Qq.jpg",
+      "assets/3-R0HW88sg.jpg",
+      "assets/officers-DKnIKC6j.css",
+      "assets/magna-carta-Bb9h5-EO.css",
+      "assets/phonebg-DooaenFK.png"
+    ]
+  },
+  "src/static/1.jpg": {
+    "file": "assets/1-wQSmvdYv.jpg",
+    "src": "src/static/1.jpg"
+  },
+  "src/static/2.jpg": {
+    "file": "assets/2-CgJE79Qq.jpg",
+    "src": "src/static/2.jpg"
+  },
+  "src/static/3.jpg": {
+    "file": "assets/3-R0HW88sg.jpg",
+    "src": "src/static/3.jpg"
+  },
+  "src/static/aboutHeader.png": {
+    "file": "assets/aboutHeader-CfkfMm4C.png",
+    "src": "src/static/aboutHeader.png"
+  },
+  "src/static/about_us.jpg": {
+    "file": "assets/about_us-CbN2GIMk.jpg",
+    "src": "src/static/about_us.jpg"
+  },
+  "src/static/eagles alpha systems.png": {
+    "file": "assets/eagles alpha systems-DzTjmL8X.png",
+    "src": "src/static/eagles alpha systems.png"
+  },
+  "src/static/events.png": {
+    "file": "assets/events-CqybEjEp.png",
+    "src": "src/static/events.png"
+  },
+  "src/static/homebg.jpg": {
+    "file": "assets/homebg-B7wpbo4d.jpg",
+    "src": "src/static/homebg.jpg"
+  },
+  "src/static/logo.png": {
+    "file": "assets/logo-BJXcv5SY.png",
+    "src": "src/static/logo.png"
+  },
+  "src/static/news.png": {
+    "file": "assets/news-DUBRnV1m.png",
+    "src": "src/static/news.png"
+  },
+  "src/static/phonebg.png": {
+    "file": "assets/phonebg-DooaenFK.png",
+    "src": "src/static/phonebg.png"
+  },
+  "src/static/placeholder.png": {
+    "file": "assets/placeholder-B7VeJ5xi.png",
+    "src": "src/static/placeholder.png"
+  }
+}

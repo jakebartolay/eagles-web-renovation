@@ -1,0 +1,23 @@
+{
+  "index.html": {
+    "file": "assets/index-7b97Gfic.js",
+    "name": "index",
+    "src": "index.html",
+    "isEntry": true,
+    "css": [
+      "assets/index-A5mSKXB2.css"
+    ],
+    "assets": [
+      "assets/admin-bg-CX7XNViF.png",
+      "assets/eagles-jvnyScUp.png"
+    ]
+  },
+  "src/assets/admin-bg.png": {
+    "file": "assets/admin-bg-CX7XNViF.png",
+    "src": "src/assets/admin-bg.png"
+  },
+  "src/assets/eagles.png": {
+    "file": "assets/eagles-jvnyScUp.png",
+    "src": "src/assets/eagles.png"
+  }
+}
