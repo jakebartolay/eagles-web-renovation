@@ -50,7 +50,7 @@ try {
     $storedThumbnail = null;
 
     if (is_array($thumbnailUpload) && (int) ($thumbnailUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-        $storedThumbnail = api_store_uploaded_file($thumbnailUpload, 'media', api_image_extensions());
+        $storedThumbnail = api_store_uploaded_file($thumbnailUpload, 'videos_thumbnail', api_image_extensions());
     }
 
     $db->beginTransaction();

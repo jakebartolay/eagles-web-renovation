@@ -41,7 +41,7 @@ try {
     ', [':video_id' => $videoId]);
 
     api_delete_uploaded_file('videos', (string) ($videoRow['video_file'] ?? ''));
-    api_delete_uploaded_file('media', (string) ($videoRow['video_thumbnail'] ?? ''));
+    api_delete_uploaded_file('videos_thumbnail', (string) ($videoRow['video_thumbnail'] ?? ''));
     api_log_admin_action($db, $admin, 'DELETE', 'Deleted video "' . (string) ($videoRow['video_title'] ?? '') . '"');
 
     api_json([

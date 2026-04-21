@@ -37,7 +37,7 @@ try {
     if (is_array($mediaUpload) && (int) ($mediaUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
         $storedMedia = api_store_uploaded_file(
             $mediaUpload,
-            'media',
+            'event_media',
             array_merge(api_image_extensions(), api_video_extensions())
         );
     }
@@ -74,7 +74,7 @@ try {
             'data' => api_event_by_id($db, $eventId),
         ], 201);
     } catch (Throwable $error) {
-        api_delete_uploaded_file('media', $storedMedia['filename'] ?? null);
+        api_delete_uploaded_file('event_media', $storedMedia['filename'] ?? null);
         throw $error;
     }
 } catch (Throwable $error) {

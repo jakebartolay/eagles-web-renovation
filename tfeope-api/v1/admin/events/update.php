@@ -53,7 +53,7 @@ try {
     if (is_array($mediaUpload) && (int) ($mediaUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
         $storedMedia = api_store_uploaded_file(
             $mediaUpload,
-            'media',
+            'event_media',
             array_merge(api_image_extensions(), api_video_extensions())
         );
     }
@@ -76,12 +76,12 @@ try {
             ':event_media' => $storedMedia['filename'] ?? (string) ($current['event_media'] ?? ''),
         ]);
     } catch (Throwable $error) {
-        api_delete_uploaded_file('media', $storedMedia['filename'] ?? null);
+        api_delete_uploaded_file('event_media', $storedMedia['filename'] ?? null);
         throw $error;
     }
 
     if ($storedMedia !== null) {
-        api_delete_uploaded_file('media', (string) ($current['event_media'] ?? ''));
+        api_delete_uploaded_file('event_media', (string) ($current['event_media'] ?? ''));
     }
 
     api_log_admin_action($db, $admin, 'UPDATE', 'Updated event "' . $title . '"');

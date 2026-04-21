@@ -435,8 +435,11 @@ if (!function_exists('api_upload_directories')) {
             'news' => $uploadsBase . '/news',
             'members' => $uploadsBase . '/members',
             'videos' => $uploadsBase . '/videos',
+            'videos_thumbnail' => $uploadsBase . '/videos_thumbnail',
+            'magna_carta' => $uploadsBase . '/magna_carta',
             'memorandum' => $uploadsBase . '/memorandum',
             'national-officers' => $uploadsBase . '/national-officers',
+            'event_media' => $uploadsBase . '/event_media',
             'media'  => $root . '/media',    // ← string lang, hindi array!
             'uploads' => $uploadsBase,
         ];
@@ -486,9 +489,12 @@ if (!function_exists('api_storage_groups')) {
                 $uploads['memorandum'],
                 $uploads['media'],
             ],
-            'event_media' => [
+            'magna_carta' => [
+                $uploads['magna_carta'],
                 $uploads['media'],
-                $legacy . '/event_media',
+            ],
+            'event_media' => [
+                $uploads['event_media'],
             ],
             'uploads' => [
                 $uploads['uploads'],
@@ -496,6 +502,7 @@ if (!function_exists('api_storage_groups')) {
                 $legacy . '/news_images',
             ],
             'videos_thumbnail' => [
+                $uploads['videos_thumbnail'],
                 $uploads['media'],
                 $legacy . '/videos_thumbnail',
             ],
@@ -643,7 +650,7 @@ if (!function_exists('api_upload_error_message')) {
 if (!function_exists('api_image_extensions')) {
     function api_image_extensions(): array
     {
-        return ['jpeg', 'jpg', 'png', 'gif', 'webp', 'jfif'];
+        return ['jpeg', 'jpg', 'png', 'gif', 'webp', 'jfif', 'bmp', 'avif', 'heic', 'heif'];
     }
 }
 
@@ -660,7 +667,13 @@ if (!function_exists('api_allowed_extensions_for_group')) {
         return match ($group) {
             'news' => api_image_extensions(),
             'videos' => api_video_extensions(),
+            'videos_thumbnail' => api_image_extensions(),
+            'magna_carta' => api_image_extensions(),
             'memorandum' => api_image_extensions(),
+            'event_media' => array_values(array_unique(array_merge(
+                api_image_extensions(),
+                api_video_extensions()
+            ))),
             'media' => array_values(array_unique(array_merge(
                 api_image_extensions(),
                 api_video_extensions()
@@ -1282,7 +1295,7 @@ if (!function_exists('api_video_payload')) {
         $videoFile = trim((string) ($row['video_file'] ?? ''));
         $thumbnailFile = trim((string) ($row['video_thumbnail'] ?? ''));
         $videoAsset = api_locate_media_file('videos', $videoFile);
-        $thumbnailAsset = api_locate_media_file('media', $thumbnailFile);
+        $thumbnailAsset = api_locate_media_file(['videos_thumbnail', 'media'], $thumbnailFile);
 
         return [
             'id' => (int) ($row['video_id'] ?? 0),
@@ -1294,7 +1307,7 @@ if (!function_exists('api_video_payload')) {
             'videoFilename' => $videoFile !== '' ? $videoFile : null,
             'videoUrl' => api_asset_url_or_fallback($videoAsset, 'videos', $videoFile),
             'thumbnailFilename' => $thumbnailFile !== '' ? $thumbnailFile : null,
-            'thumbnailUrl' => api_asset_url_or_fallback($thumbnailAsset, 'media', $thumbnailFile),
+            'thumbnailUrl' => api_asset_url_or_fallback($thumbnailAsset, 'videos_thumbnail', $thumbnailFile),
         ];
     }
 }
@@ -1347,7 +1360,14 @@ if (!function_exists('api_event_payload')) {
     function api_event_payload(array $row): array
     {
         $mediaFile = trim((string) ($row['event_media'] ?? ''));
-        $mediaAsset = api_locate_media_file('media', $mediaFile);
+        $mediaAsset = api_locate_media_file('event_media', $mediaFile);
+
+        if ($mediaAsset === null) {
+            $fallbackAsset = api_locate_media_file('event_media', 'default_event.png');
+            if ($fallbackAsset !== null) {
+                $mediaAsset = $fallbackAsset;
+            }
+        }
 
         return [
             'id' => (int) ($row['event_id'] ?? 0),
@@ -1357,7 +1377,7 @@ if (!function_exists('api_event_payload')) {
             'type' => (string) ($row['event_type'] ?? ''),
             'createdAt' => (string) ($row['created_at'] ?? ''),
             'mediaFilename' => $mediaFile !== '' ? $mediaFile : null,
-            'mediaUrl' => api_asset_url_or_fallback($mediaAsset, 'media', $mediaFile),
+            'mediaUrl' => api_asset_url_or_fallback($mediaAsset, 'event_media', $mediaFile),
             'mediaType' => api_media_type($mediaFile),
         ];
     }
@@ -1727,7 +1747,7 @@ if (!function_exists('api_governor_by_id')) {
 }
 
 if (!function_exists('api_magna_carta_list')) {
-    function api_magna_carta_list(PDO $db): array
+    function api_magna_carta_list(PDO $db, bool $publishedOnly = true): array
     {
         if (!api_table_exists($db, 'magna_carta_items')) {
             return [];
@@ -1741,7 +1761,7 @@ if (!function_exists('api_magna_carta_list')) {
         }
 
         $sql = 'SELECT ' . implode(', ', array_map('api_quote_identifier', $selects)) . ' FROM magna_carta_items';
-        if (api_has_column($db, 'magna_carta_items', 'is_active')) {
+        if ($publishedOnly && api_has_column($db, 'magna_carta_items', 'is_active')) {
             $sql .= ' WHERE is_active = 1';
         }
         $sql .= api_has_column($db, 'magna_carta_items', 'created_at')
@@ -1752,7 +1772,8 @@ if (!function_exists('api_magna_carta_list')) {
 
         return array_map(static function (array $row): array {
             $imageFile = trim((string) ($row['image_path'] ?? ''));
-            $imageAsset = api_locate_media_file('media', $imageFile);
+            $imageAsset = api_locate_media_file(['magna_carta', 'media'], $imageFile);
+            $isActive = (int) ($row['is_active'] ?? 1) === 1;
 
             return [
                 'id' => (int) ($row['id'] ?? 0),
@@ -1761,7 +1782,9 @@ if (!function_exists('api_magna_carta_list')) {
                 'content' => (string) ($row['content'] ?? $row['description'] ?? ''),
                 'description' => (string) ($row['description'] ?? $row['content'] ?? ''),
                 'imageFilename' => $imageFile !== '' ? $imageFile : null,
-                'imageUrl' => $imageAsset['url'] ?? null,
+                'imageUrl' => api_asset_url_or_fallback($imageAsset, 'magna_carta', $imageFile),
+                'isActive' => $isActive,
+                'status' => $isActive ? 'Published' : 'Draft',
                 'createdAt' => (string) ($row['created_at'] ?? ''),
                 'updatedAt' => (string) ($row['updated_at'] ?? ''),
             ];

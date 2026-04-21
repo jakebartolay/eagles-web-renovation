@@ -40,7 +40,7 @@ try {
         WHERE event_id = :event_id
     ', [':event_id' => $eventId]);
 
-    api_delete_uploaded_file('media', (string) ($eventRow['event_media'] ?? ''));
+    api_delete_uploaded_file('event_media', (string) ($eventRow['event_media'] ?? ''));
     api_log_admin_action($db, $admin, 'DELETE', 'Deleted event "' . (string) ($eventRow['event_title'] ?? '') . '"');
 
     api_json([

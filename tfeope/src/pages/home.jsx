@@ -3,7 +3,7 @@ import '../theme/navbar.css'
 import '../theme/home.css'
 import '../theme/footer.css'
 import '../App.css'
-import { PUBLIC_BRANDING, PUBLIC_HOME_ENDPOINT, PUBLIC_NEWS_ENDPOINT } from '../config'
+import { PUBLIC_BRANDING, PUBLIC_HOME_ENDPOINT, PUBLIC_NEWS_ENDPOINT, publicMediaUrl } from '../config'
 
 const fallbackData = {
   stats: {
@@ -76,6 +76,49 @@ function formatDate(value) {
 
 function formatNumber(value) {
   return new Intl.NumberFormat('en-PH').format(Number(value) || 0)
+}
+
+function uniqueStrings(items) {
+  return Array.from(new Set(items.filter(Boolean)))
+}
+
+function HomeEventMedia({ item }) {
+  const candidateSources = useMemo(
+    () =>
+      uniqueStrings([
+        item?.mediaUrl,
+        publicMediaUrl('event_media', item?.mediaFilename),
+      ]),
+    [item?.mediaFilename, item?.mediaUrl],
+  )
+  const [sourceIndex, setSourceIndex] = useState(0)
+
+  useEffect(() => {
+    setSourceIndex(0)
+  }, [candidateSources])
+
+  const source = candidateSources[sourceIndex] || null
+  const isVideo = `${item?.mediaType || ''}`.toLowerCase() === 'video'
+
+  if (!source) {
+    return <div className="react-image-fallback tall">No event media</div>
+  }
+
+  if (isVideo) {
+    return (
+      <video controls preload="metadata" onError={() => setSourceIndex((current) => current + 1)}>
+        <source src={source} />
+      </video>
+    )
+  }
+
+  return (
+    <img
+      src={source}
+      alt={item?.title || 'Event media'}
+      onError={() => setSourceIndex((current) => current + 1)}
+    />
+  )
 }
 
 async function fetchApiPayload(url, signal, fallbackMessage) {
@@ -624,17 +667,7 @@ function App() {
           {pageData.events.length > 0 ? (
             pageData.events.map((event) => (
               <div className="event-card" key={event.id}>
-                {event.mediaUrl ? (
-                  event.mediaType === 'video' ? (
-                    <video controls preload="metadata">
-                      <source src={event.mediaUrl} />
-                    </video>
-                  ) : (
-                    <img src={event.mediaUrl} alt={event.title} />
-                  )
-                ) : (
-                  <div className="react-image-fallback tall">No event media</div>
-                )}
+                <HomeEventMedia item={event} />
                 <h4>{event.title}</h4>
                 <p>{formatDate(event.date)}</p>
                 <p>{event.description || 'No event description available.'}</p>
@@ -646,7 +679,7 @@ function App() {
         </div>
 
         <div className="react-events-cta">
-          <a href="#eventsSection" className="btn-primary">
+          <a href={appLinks.events} className="btn-primary" onClick={(event) => handleNavLinkClick(event, appLinks.events)}>
             View All Events
           </a>
         </div>

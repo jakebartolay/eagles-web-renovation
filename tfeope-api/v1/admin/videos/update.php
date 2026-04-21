@@ -64,7 +64,7 @@ try {
     }
 
     if (is_array($thumbnailUpload) && (int) ($thumbnailUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-        $storedThumbnail = api_store_uploaded_file($thumbnailUpload, 'media', api_image_extensions());
+        $storedThumbnail = api_store_uploaded_file($thumbnailUpload, 'videos_thumbnail', api_image_extensions());
     }
 
     try {
@@ -86,7 +86,7 @@ try {
         ]);
     } catch (Throwable $error) {
         api_delete_uploaded_file('videos', $storedVideo['filename'] ?? null);
-        api_delete_uploaded_file('media', $storedThumbnail['filename'] ?? null);
+        api_delete_uploaded_file('videos_thumbnail', $storedThumbnail['filename'] ?? null);
         throw $error;
     }
 
@@ -95,7 +95,7 @@ try {
     }
 
     if ($storedThumbnail !== null) {
-        api_delete_uploaded_file('media', (string) ($current['video_thumbnail'] ?? ''));
+        api_delete_uploaded_file('videos_thumbnail', (string) ($current['video_thumbnail'] ?? ''));
     }
 
     api_log_admin_action($db, $admin, 'UPDATE', 'Updated video "' . $title . '"');
