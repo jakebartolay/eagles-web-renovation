@@ -1,22 +1,47 @@
-const API_ORIGIN = (import.meta.env.VITE_API_ORIGIN || (import.meta.env.DEV ? 'http://localhost' : '')).replace(/\/$/, '')
+const PROD_API_ORIGIN = 'https://api.tfoepe-inc.com.ph'
 
-function apiUrl(path) {
-  return `${API_ORIGIN}${path}`
+function normalizeOrigin(origin) {
+  const trimmed = String(origin || '').trim().replace(/\/$/, '')
+  if (!trimmed) {
+    return trimmed
+  }
+
+  // Force HTTPS outside local development.
+  if (!import.meta.env.DEV && /^http:\/\//i.test(trimmed)) {
+    const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(trimmed)
+    if (!isLocalhost) {
+      return trimmed.replace(/^http:\/\//i, 'https://')
+    }
+  }
+
+  return trimmed
 }
 
-export const PUBLIC_HOME_ENDPOINT = apiUrl('/tfeope-api/api/public/home.php')
-export const PUBLIC_NEWS_ENDPOINT = apiUrl('/tfeope-api/v1/client/news/get_all.php')
-export const PUBLIC_VIDEOS_ENDPOINT = apiUrl('/tfeope-api/v1/client/videos/get_all.php')
-export const PUBLIC_UPCOMING_EVENTS_ENDPOINT = apiUrl('/tfeope-api/v1/client/events/get_upcoming.php')
-export const PUBLIC_PAST_EVENTS_ENDPOINT = apiUrl('/tfeope-api/v1/client/events/get_past.php')
-export const PUBLIC_GOVERNORS_ENDPOINT = apiUrl('/tfeope-api/v1/client/governors/get_all.php')
-export const PUBLIC_OFFICERS_ENDPOINT = apiUrl('/tfeope-api/v1/client/officers/get_all.php')
-export const PUBLIC_MAGNA_CARTA_ENDPOINT = apiUrl('/tfeope-api/v1/client/magna_carta/get_all.php')
-export const PUBLIC_APPOINTED_ENDPOINT = apiUrl('/tfeope-api/v1/client/appointed/get_all.php')
-export const PUBLIC_AUTH_SESSION_ENDPOINT = apiUrl('/tfeope-api/v1/client/auth/session.php')
-export const PUBLIC_AUTH_LOGIN_ENDPOINT = apiUrl('/tfeope-api/v1/client/auth/login.php')
-export const PUBLIC_AUTH_SIGNUP_ENDPOINT = apiUrl('/tfeope-api/v1/client/auth/signup.php')
-export const PUBLIC_MEMBER_VERIFY_ENDPOINT = apiUrl('/tfeope-api/v1/client/members/verify.php')
+const defaultOrigin = import.meta.env.VITE_API_ORIGIN
+  || (import.meta.env.DEV ? 'http://localhost' : PROD_API_ORIGIN)
+const API_ORIGIN = normalizeOrigin(defaultOrigin)
+const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH || '/tfeope-api').replace(/\/$/, '')
+
+function apiUrl(path) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${API_ORIGIN}${API_BASE_PATH}${normalizedPath}`
+}
+
+export const PUBLIC_API_BASE_URL = `${API_ORIGIN}${API_BASE_PATH}`
+
+export const PUBLIC_HOME_ENDPOINT = apiUrl('/api/public/home.php')
+export const PUBLIC_NEWS_ENDPOINT = apiUrl('/v1/client/news/get_all.php')
+export const PUBLIC_VIDEOS_ENDPOINT = apiUrl('/v1/client/videos/get_all.php')
+export const PUBLIC_UPCOMING_EVENTS_ENDPOINT = apiUrl('/v1/client/events/get_upcoming.php')
+export const PUBLIC_PAST_EVENTS_ENDPOINT = apiUrl('/v1/client/events/get_past.php')
+export const PUBLIC_GOVERNORS_ENDPOINT = apiUrl('/v1/client/governors/get_all.php')
+export const PUBLIC_OFFICERS_ENDPOINT = apiUrl('/v1/client/officers/get_all.php')
+export const PUBLIC_MAGNA_CARTA_ENDPOINT = apiUrl('/v1/client/magna_carta/get_all.php')
+export const PUBLIC_APPOINTED_ENDPOINT = apiUrl('/v1/client/appointed/get_all.php')
+export const PUBLIC_AUTH_SESSION_ENDPOINT = apiUrl('/v1/client/auth/session.php')
+export const PUBLIC_AUTH_LOGIN_ENDPOINT = apiUrl('/v1/client/auth/login.php')
+export const PUBLIC_AUTH_SIGNUP_ENDPOINT = apiUrl('/v1/client/auth/signup.php')
+export const PUBLIC_MEMBER_VERIFY_ENDPOINT = apiUrl('/v1/client/members/verify.php')
 
 export const PUBLIC_BRANDING = {
   logoUrl: new URL('./static/logo.png', import.meta.url).href,
@@ -37,5 +62,15 @@ export function publicMediaUrl(group, filename) {
     file: filename,
   })
 
-  return apiUrl(`/tfeope-api/media.php?${query.toString()}`)
+  return apiUrl(`/media.php?${query.toString()}`)
+}
+
+export function publicOfficersByCategoryUrl(category) {
+  const query = new URLSearchParams()
+  if (category) {
+    query.set('category', category)
+  }
+
+  const suffix = query.toString()
+  return apiUrl(`/v1/client/officers/get_all.php${suffix ? `?${suffix}` : ''}`)
 }

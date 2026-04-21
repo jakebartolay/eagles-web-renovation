@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import { publicOfficersByCategoryUrl } from '../config'
 
-const API_URL = 'http://localhost/tfeope-api/v1/client/officers/get_all.php?category=secretariat'
+const API_URL = publicOfficersByCategoryUrl('secretariat')
 
 export default function Secretariat() {
   const [members, setMembers] = useState([])

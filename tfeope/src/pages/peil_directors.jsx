@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
+import { publicOfficersByCategoryUrl } from '../config'
 
-const API_URL = 'http://localhost/tfeope-api/v1/client/officers/get_all.php?category=peil_directors'
+const API_URL = publicOfficersByCategoryUrl('peil_directors')
 
 export default function PeilDirectors() {
   const [directors, setDirectors] = useState([])
