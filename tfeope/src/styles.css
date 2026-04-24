@@ -603,16 +603,7 @@ p {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.38)),
-    rgba(0, 0, 0, 0.18);
-  transition: background 0.22s ease;
-}
-
-.home-hymnal-video:hover::after {
-  background:
-    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.32)),
-    rgba(0, 0, 0, 0.12);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.08) 0%, rgba(0, 0, 0, 0.2) 42%, rgba(0, 0, 0, 0.78) 100%);
 }
 
 .home-hymnal-play {
@@ -649,7 +640,6 @@ p {
   gap: 0.22rem;
   color: #fff;
   text-align: left;
-  text-shadow: none;
 }
 
 .home-hymnal-overlay strong {
@@ -677,9 +667,7 @@ p {
   position: absolute;
   inset: 0;
   border: 0;
-  background: rgba(0, 0, 0, 0.88);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
+  background: rgba(4, 10, 24, 0.76);
   cursor: pointer;
 }
 
@@ -690,8 +678,8 @@ p {
   max-height: calc(100vh - 3rem);
   overflow: auto;
   border-radius: 14px;
-  background: #000;
-  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.7);
+  background: #fff;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.38);
 }
 
 .home-video-modal-close {
@@ -717,6 +705,19 @@ p {
   aspect-ratio: 16 / 9;
   display: block;
   background: #000;
+}
+
+.home-video-modal-caption {
+  padding: 1rem 1.15rem 1.2rem;
+}
+
+.home-video-modal-caption h3 {
+  color: var(--eagle-primary);
+  margin-bottom: 0.25rem;
+}
+
+.home-video-modal-caption p {
+  color: var(--text-secondary);
 }
 
 /* Home Memorandum */
