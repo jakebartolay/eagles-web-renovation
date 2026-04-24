@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Skeleton from '@mui/material/Skeleton'
 
 function formatDate(value) {
   if (!value) return 'No timestamp'
@@ -30,7 +31,7 @@ function countByKeyword(items, keyword) {
   return items.filter((item) => String(item?.actionType || '').toLowerCase().includes(keyword)).length
 }
 
-export default function ActivityPage({ dashboard, user, query }) {
+export default function ActivityPage({ dashboard, user, query, loading = false }) {
   const [currentPage, setCurrentPage] = useState(1)
   const activities = Array.isArray(dashboard?.activity) ? dashboard.activity : []
   const isSuperAdmin = Number(user?.roleId || user?.role_id || 0) === 1
@@ -59,6 +60,50 @@ export default function ActivityPage({ dashboard, user, query }) {
   useEffect(() => {
     setCurrentPage((page) => (page > totalPages ? totalPages : page))
   }, [totalPages])
+
+  if (loading) {
+    return (
+      <section className="activity-page">
+        <section className="content-section-card">
+          <div className="content-section-card__header">
+            <div>
+              <p className="page-kicker">Audit Trail</p>
+              <h2>{isSuperAdmin ? 'All Activity Logs' : 'My Activity Logs'}</h2>
+              <p>Loading activity logs...</p>
+            </div>
+          </div>
+
+          <div className="content-summary-strip">
+            <article className="content-summary-chip positive">
+              <span>Created</span>
+              <strong><Skeleton variant="text" width={44} height={30} /></strong>
+              <small><Skeleton variant="text" width={120} height={16} /></small>
+            </article>
+
+            <article className="content-summary-chip info">
+              <span>Updated</span>
+              <strong><Skeleton variant="text" width={44} height={30} /></strong>
+              <small><Skeleton variant="text" width={122} height={16} /></small>
+            </article>
+
+            <article className="content-summary-chip danger">
+              <span>Deleted</span>
+              <strong><Skeleton variant="text" width={44} height={30} /></strong>
+              <small><Skeleton variant="text" width={104} height={16} /></small>
+            </article>
+          </div>
+
+          <div className="content-section-card__body">
+            <div style={{ display: 'grid', gap: '0.65rem' }}>
+              {Array.from({ length: 9 }).map((_, index) => (
+                <Skeleton key={`activity-row-skeleton-${index}`} variant="rounded" height={52} />
+              ))}
+            </div>
+          </div>
+        </section>
+      </section>
+    )
+  }
 
   return (
     <section className="activity-page">

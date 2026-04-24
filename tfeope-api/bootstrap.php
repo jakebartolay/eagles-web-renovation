@@ -439,6 +439,8 @@ if (!function_exists('api_upload_directories')) {
             'magna_carta' => $uploadsBase . '/magna_carta',
             'memorandum' => $uploadsBase . '/memorandum',
             'national-officers' => $uploadsBase . '/national-officers',
+            'governors' => $uploadsBase . '/officers/governor',
+            'past-leaders' => $uploadsBase . '/officers/past_leaders',
             'event_media' => $uploadsBase . '/event_media',
             'media'  => $root . '/media',    // ← string lang, hindi array!
             'uploads' => $uploadsBase,
@@ -470,10 +472,21 @@ if (!function_exists('api_storage_groups')) {
             'national-officers' => [
                 $uploads['national-officers'],
             ],
+            'governors' => [
+                $uploads['governors'],
+                $legacy . '/officers/governor',
+                $legacy . '/officers',
+            ],
+            'past-leaders' => [
+                $uploads['past-leaders'],
+                $legacy . '/officers/past_leaders',
+                $legacy . '/officers',
+            ],
             'media' => [
                 $uploads['media'],
                 $uploads['members'],
                 $uploads['national-officers'],
+                $uploads['past-leaders'],
                 $legacy . '/memorandum',
                 $legacy . '/event_media',
                 $legacy . '/uploads',
@@ -495,6 +508,11 @@ if (!function_exists('api_storage_groups')) {
             ],
             'event_media' => [
                 $uploads['event_media'],
+                // Backward compatibility: older event rows were stored under the shared media folder.
+                $uploads['media'],
+                $uploads['uploads'],
+                $legacy . '/event_media',
+                $legacy . '/uploads',
             ],
             'uploads' => [
                 $uploads['uploads'],
@@ -1617,6 +1635,289 @@ if (!function_exists('api_officer_by_id')) {
     }
 }
 
+if (!function_exists('api_appointed_field_map')) {
+    function api_appointed_field_map(PDO $db): array
+    {
+        return [
+            'name' => api_first_column($db, 'appointed', ['name', 'officer_name']),
+            'position' => api_first_column($db, 'appointed', ['position', 'designation']),
+            'committee' => api_first_column($db, 'appointed', ['committee', 'club']),
+            'region' => api_first_column($db, 'appointed', ['region']),
+        ];
+    }
+}
+
+if (!function_exists('api_appointed_payload')) {
+    function api_appointed_payload(array $row): array
+    {
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'name' => trim((string) ($row['appointed_name'] ?? $row['name'] ?? '')),
+            'position' => trim((string) ($row['appointed_position'] ?? $row['position'] ?? '')),
+            'committee' => trim((string) ($row['appointed_committee'] ?? $row['committee'] ?? $row['club'] ?? '')),
+            'region' => trim((string) ($row['appointed_region'] ?? $row['region'] ?? '')),
+            'createdAt' => (string) ($row['created_at'] ?? ''),
+            'updatedAt' => (string) ($row['updated_at'] ?? ''),
+        ];
+    }
+}
+
+if (!function_exists('api_appointed_list')) {
+    function api_appointed_list(PDO $db): array
+    {
+        if (!api_table_exists($db, 'appointed')) {
+            return [];
+        }
+
+        $map = api_appointed_field_map($db);
+        $selects = ['id'];
+        $selects[] = $map['name'] !== null
+            ? api_quote_identifier($map['name']) . ' AS appointed_name'
+            : 'NULL AS appointed_name';
+        $selects[] = $map['position'] !== null
+            ? api_quote_identifier($map['position']) . ' AS appointed_position'
+            : 'NULL AS appointed_position';
+        $selects[] = $map['committee'] !== null
+            ? api_quote_identifier($map['committee']) . ' AS appointed_committee'
+            : 'NULL AS appointed_committee';
+        $selects[] = $map['region'] !== null
+            ? api_quote_identifier($map['region']) . ' AS appointed_region'
+            : 'NULL AS appointed_region';
+        $selects[] = api_has_column($db, 'appointed', 'created_at')
+            ? 'created_at'
+            : 'NULL AS created_at';
+        $selects[] = api_has_column($db, 'appointed', 'updated_at')
+            ? 'updated_at'
+            : 'NULL AS updated_at';
+
+        $orderParts = [];
+        foreach (['region', 'committee', 'position', 'name'] as $key) {
+            $column = $map[$key] ?? null;
+            if ($column !== null) {
+                $orderParts[] = api_quote_identifier($column) . ' ASC';
+            }
+        }
+        $orderParts[] = 'id ASC';
+
+        $rows = api_fetch_all(
+            $db,
+            'SELECT ' . implode(', ', $selects) . '
+             FROM appointed
+             ORDER BY ' . implode(', ', $orderParts)
+        );
+
+        return array_map(static fn (array $row): array => api_appointed_payload($row), $rows);
+    }
+}
+
+if (!function_exists('api_appointed_by_id')) {
+    function api_appointed_by_id(PDO $db, int $appointedId): ?array
+    {
+        if (!api_table_exists($db, 'appointed')) {
+            return null;
+        }
+
+        $map = api_appointed_field_map($db);
+        $selects = ['id'];
+        $selects[] = $map['name'] !== null
+            ? api_quote_identifier($map['name']) . ' AS appointed_name'
+            : 'NULL AS appointed_name';
+        $selects[] = $map['position'] !== null
+            ? api_quote_identifier($map['position']) . ' AS appointed_position'
+            : 'NULL AS appointed_position';
+        $selects[] = $map['committee'] !== null
+            ? api_quote_identifier($map['committee']) . ' AS appointed_committee'
+            : 'NULL AS appointed_committee';
+        $selects[] = $map['region'] !== null
+            ? api_quote_identifier($map['region']) . ' AS appointed_region'
+            : 'NULL AS appointed_region';
+        $selects[] = api_has_column($db, 'appointed', 'created_at')
+            ? 'created_at'
+            : 'NULL AS created_at';
+        $selects[] = api_has_column($db, 'appointed', 'updated_at')
+            ? 'updated_at'
+            : 'NULL AS updated_at';
+
+        $row = api_fetch_one(
+            $db,
+            'SELECT ' . implode(', ', $selects) . '
+             FROM appointed
+             WHERE id = :id
+             LIMIT 1',
+            [':id' => $appointedId]
+        );
+
+        return $row !== null ? api_appointed_payload($row) : null;
+    }
+}
+
+if (!function_exists('api_past_leader_field_map')) {
+    function api_past_leader_field_map(PDO $db): array
+    {
+        return [
+            'id' => api_first_column($db, 'past_leaders', ['id']),
+            'name' => api_first_column($db, 'past_leaders', ['name']),
+            'position' => api_first_column($db, 'past_leaders', ['position']),
+            'term_start' => api_first_column($db, 'past_leaders', ['term_start']),
+            'term_end' => api_first_column($db, 'past_leaders', ['term_end']),
+            'photo' => api_first_column($db, 'past_leaders', ['photo']),
+            'achievements' => api_first_column($db, 'past_leaders', ['achievements']),
+            'order_priority' => api_first_column($db, 'past_leaders', ['order_priority']),
+            'is_active' => api_first_column($db, 'past_leaders', ['is_active']),
+            'created_at' => api_first_column($db, 'past_leaders', ['created_at']),
+            'updated_at' => api_first_column($db, 'past_leaders', ['updated_at']),
+        ];
+    }
+}
+
+if (!function_exists('api_ensure_past_leaders_table')) {
+    function api_ensure_past_leaders_table(PDO $db): void
+    {
+        if (api_table_exists($db, 'past_leaders')) {
+            return;
+        }
+
+        api_execute($db, '
+            CREATE TABLE IF NOT EXISTS past_leaders (
+                id INT PRIMARY KEY AUTO_INCREMENT,
+                name VARCHAR(255) NOT NULL,
+                position VARCHAR(100) NOT NULL,
+                term_start YEAR NOT NULL,
+                term_end YEAR NOT NULL,
+                photo VARCHAR(255) DEFAULT NULL,
+                achievements TEXT DEFAULT NULL,
+                order_priority INT DEFAULT 0,
+                is_active TINYINT DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ');
+    }
+}
+
+if (!function_exists('api_past_leader_payload')) {
+    function api_past_leader_payload(array $row): array
+    {
+        $photoFile = trim((string) ($row['photo'] ?? ''));
+        $photoAsset = api_locate_media_file(['past-leaders', 'media'], $photoFile);
+        $termStart = trim((string) ($row['term_start'] ?? ''));
+        $termEnd = trim((string) ($row['term_end'] ?? ''));
+
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'name' => trim((string) ($row['name'] ?? '')),
+            'position' => trim((string) ($row['position'] ?? '')),
+            'termStart' => $termStart,
+            'termEnd' => $termEnd,
+            'term_start' => $termStart,
+            'term_end' => $termEnd,
+            'photoFilename' => $photoFile !== '' ? $photoFile : null,
+            'photo' => $photoFile !== '' ? $photoFile : null,
+            'photoUrl' => api_asset_url_or_fallback($photoAsset, 'past-leaders', $photoFile),
+            'achievements' => trim((string) ($row['achievements'] ?? '')),
+            'orderPriority' => (int) ($row['order_priority'] ?? 0),
+            'order_priority' => (int) ($row['order_priority'] ?? 0),
+            'isActive' => (int) ($row['is_active'] ?? 1) === 1,
+            'is_active' => (int) ($row['is_active'] ?? 1),
+            'createdAt' => (string) ($row['created_at'] ?? ''),
+            'updatedAt' => (string) ($row['updated_at'] ?? ''),
+        ];
+    }
+}
+
+if (!function_exists('api_past_leader_list')) {
+    function api_past_leader_list(PDO $db, bool $activeOnly = true): array
+    {
+        api_ensure_past_leaders_table($db);
+
+        if (!api_table_exists($db, 'past_leaders')) {
+            return [];
+        }
+
+        $map = api_past_leader_field_map($db);
+        if ($map['id'] === null || $map['name'] === null || $map['position'] === null || $map['term_start'] === null || $map['term_end'] === null) {
+            return [];
+        }
+
+        $selects = [
+            api_quote_identifier($map['id']) . ' AS id',
+            api_quote_identifier($map['name']) . ' AS name',
+            api_quote_identifier($map['position']) . ' AS position',
+            api_quote_identifier($map['term_start']) . ' AS term_start',
+            api_quote_identifier($map['term_end']) . ' AS term_end',
+            $map['photo'] !== null ? api_quote_identifier($map['photo']) . ' AS photo' : 'NULL AS photo',
+            $map['achievements'] !== null ? api_quote_identifier($map['achievements']) . ' AS achievements' : 'NULL AS achievements',
+            $map['order_priority'] !== null ? api_quote_identifier($map['order_priority']) . ' AS order_priority' : '0 AS order_priority',
+            $map['is_active'] !== null ? api_quote_identifier($map['is_active']) . ' AS is_active' : '1 AS is_active',
+            $map['created_at'] !== null ? api_quote_identifier($map['created_at']) . ' AS created_at' : 'NULL AS created_at',
+            $map['updated_at'] !== null ? api_quote_identifier($map['updated_at']) . ' AS updated_at' : 'NULL AS updated_at',
+        ];
+
+        $where = '';
+        if ($activeOnly && $map['is_active'] !== null) {
+            $where = ' WHERE ' . api_quote_identifier($map['is_active']) . ' = 1';
+        }
+
+        $order = [];
+        if ($map['order_priority'] !== null) {
+            $order[] = api_quote_identifier($map['order_priority']) . ' ASC';
+        }
+        $order[] = api_quote_identifier($map['term_end']) . ' DESC';
+        $order[] = api_quote_identifier($map['term_start']) . ' DESC';
+        $order[] = api_quote_identifier($map['id']) . ' ASC';
+
+        $rows = api_fetch_all(
+            $db,
+            'SELECT ' . implode(', ', $selects) . '
+             FROM past_leaders' . $where . '
+             ORDER BY ' . implode(', ', $order)
+        );
+
+        return array_map(static fn (array $row): array => api_past_leader_payload($row), $rows);
+    }
+}
+
+if (!function_exists('api_past_leader_by_id')) {
+    function api_past_leader_by_id(PDO $db, int $pastLeaderId): ?array
+    {
+        api_ensure_past_leaders_table($db);
+
+        if (!api_table_exists($db, 'past_leaders')) {
+            return null;
+        }
+
+        $map = api_past_leader_field_map($db);
+        if ($map['id'] === null || $map['name'] === null || $map['position'] === null || $map['term_start'] === null || $map['term_end'] === null) {
+            return null;
+        }
+
+        $selects = [
+            api_quote_identifier($map['id']) . ' AS id',
+            api_quote_identifier($map['name']) . ' AS name',
+            api_quote_identifier($map['position']) . ' AS position',
+            api_quote_identifier($map['term_start']) . ' AS term_start',
+            api_quote_identifier($map['term_end']) . ' AS term_end',
+            $map['photo'] !== null ? api_quote_identifier($map['photo']) . ' AS photo' : 'NULL AS photo',
+            $map['achievements'] !== null ? api_quote_identifier($map['achievements']) . ' AS achievements' : 'NULL AS achievements',
+            $map['order_priority'] !== null ? api_quote_identifier($map['order_priority']) . ' AS order_priority' : '0 AS order_priority',
+            $map['is_active'] !== null ? api_quote_identifier($map['is_active']) . ' AS is_active' : '1 AS is_active',
+            $map['created_at'] !== null ? api_quote_identifier($map['created_at']) . ' AS created_at' : 'NULL AS created_at',
+            $map['updated_at'] !== null ? api_quote_identifier($map['updated_at']) . ' AS updated_at' : 'NULL AS updated_at',
+        ];
+
+        $row = api_fetch_one(
+            $db,
+            'SELECT ' . implode(', ', $selects) . '
+             FROM past_leaders
+             WHERE ' . api_quote_identifier($map['id']) . ' = :id
+             LIMIT 1',
+            [':id' => $pastLeaderId]
+        );
+
+        return $row !== null ? api_past_leader_payload($row) : null;
+    }
+}
+
 if (!function_exists('api_governor_field_map')) {
     function api_governor_field_map(PDO $db): array
     {
@@ -1691,7 +1992,7 @@ if (!function_exists('api_governor_list')) {
         foreach ($governors as $governor) {
             $governorId = (int) ($governor['governor_id'] ?? 0);
             $imageFile = trim((string) ($governor['governor_image'] ?? ''));
-            $imageAsset = api_locate_media_file('media', $imageFile);
+            $imageAsset = api_locate_media_file(['governors', 'media'], $imageFile);
 
             $regionItems = [];
             foreach ($regionsByGovernor[$governorId] ?? [] as $region) {

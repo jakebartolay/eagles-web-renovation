@@ -4,16 +4,27 @@ import {
   useEffectEvent,
   useState,
 } from 'react'
+import Backdrop from '@mui/material/Backdrop'
+import Box from '@mui/material/Box'
+import CircularProgress from '@mui/material/CircularProgress'
 import './App.css'
 import './admin-app/admin.css'
 import {
+  ADMIN_APPOINTED_CREATE_ENDPOINT,
+  ADMIN_APPOINTED_DELETE_ENDPOINT,
+  ADMIN_APPOINTED_ENDPOINT,
+  ADMIN_APPOINTED_UPDATE_ENDPOINT,
   ADMIN_BRANDING,
   ADMIN_DASHBOARD_ENDPOINT,
   ADMIN_EVENTS_ENDPOINT,
   ADMIN_EVENTS_CREATE_ENDPOINT,
   ADMIN_EVENTS_UPDATE_ENDPOINT,
   ADMIN_EVENTS_DELETE_ENDPOINT,
+  ADMIN_CLUBS_CREATE_ENDPOINT,
+  ADMIN_GOVERNORS_CREATE_ENDPOINT,
+  ADMIN_GOVERNORS_DELETE_ENDPOINT,
   ADMIN_GOVERNORS_ENDPOINT,
+  ADMIN_GOVERNORS_UPDATE_ENDPOINT,
   ADMIN_LOGIN_ENDPOINT,
   ADMIN_LOGOUT_ENDPOINT,
   ADMIN_MEMBERS_ENDPOINT,
@@ -37,10 +48,15 @@ import {
   ADMIN_USERS_CREATE_ENDPOINT,
   ADMIN_USERS_UPDATE_ENDPOINT,
   ADMIN_USERS_DELETE_ENDPOINT,
+  ADMIN_REGIONS_CREATE_ENDPOINT,
+  ADMIN_REGIONS_UPDATE_ENDPOINT,
+  ADMIN_PAST_LEADERS_ENDPOINT,
+  ADMIN_PAST_LEADERS_CREATE_ENDPOINT,
+  ADMIN_PAST_LEADERS_UPDATE_ENDPOINT,
+  ADMIN_PAST_LEADERS_DELETE_ENDPOINT,
   ADMIN_VIDEOS_ENDPOINT,
   ADMIN_VIDEOS_CREATE_ENDPOINT,
   ADMIN_VIDEOS_UPDATE_ENDPOINT,
-  APPOINTED_ENDPOINT,
 } from './config'
 import {
   emptyCollections,
@@ -69,6 +85,7 @@ import {
   AppointedPage,
   GovernorsPage,
   OfficersPage,
+  PastLeadersPage,
 } from './admin-app/pages/LeadershipPages'
 import ActivityPage from './admin-app/pages/ActivityPage'
 import ActionModal from './admin-app/components/ActionModal'
@@ -82,9 +99,13 @@ const collectionLoaders = [
   { key: 'memorandums', label: 'Memorandum', endpoint: ADMIN_MEMORANDUM_ENDPOINT },
   { key: 'officers', label: 'Officers', endpoint: ADMIN_OFFICERS_ENDPOINT },
   { key: 'governors', label: 'Governors', endpoint: ADMIN_GOVERNORS_ENDPOINT },
-  { key: 'appointed', label: 'Appointed Officers', endpoint: APPOINTED_ENDPOINT },
+  { key: 'appointed', label: 'Appointed Officers', endpoint: ADMIN_APPOINTED_ENDPOINT },
+  { key: 'pastLeaders', label: 'Past Leaders', endpoint: ADMIN_PAST_LEADERS_ENDPOINT },
   { key: 'magnaCarta', label: 'Magna Carta', endpoint: ADMIN_MAGNA_CARTA_ENDPOINT },
 ]
+
+const INACTIVITY_WARNING_MS = 20 * 60 * 1000
+const INACTIVITY_EVENTS = ['pointerdown', 'keydown', 'mousemove', 'scroll', 'touchstart']
 
 const pageToCollectionKey = {
   members: 'members',
@@ -96,6 +117,7 @@ const pageToCollectionKey = {
   officers: 'officers',
   governors: 'governors',
   appointed: 'appointed',
+  pastLeaders: 'pastLeaders',
   magnaCarta: 'magnaCarta',
 }
 
@@ -103,60 +125,110 @@ function sortLabels(items) {
   return [...items].sort((first, second) => first.localeCompare(second))
 }
 
-function buildRegionClubMap(members = [], governors = []) {
-  const nextMap = {}
+function normalizeLookupKey(value) {
+  return String(value || '').trim().toUpperCase()
+}
 
-  function ensureRegion(value) {
-    const region = String(value || '').trim()
-    if (region === '') {
-      return ''
+function decodeUriComponentSafe(value) {
+  try {
+    return decodeURIComponent(String(value || ''))
+  } catch {
+    return String(value || '')
+  }
+}
+
+function parseGovernorSelection(value) {
+  const selection = String(value || '').trim()
+  if (selection === '' || selection === '__NEW__') {
+    return {
+      selection,
+      governorId: 0,
+      regionId: 0,
+      regionName: '',
+      governorName: '',
     }
-
-    if (!nextMap[region]) {
-      nextMap[region] = new Set()
-    }
-
-    return region
   }
 
-  function registerClub(regionValue, clubValue) {
-    const region = ensureRegion(regionValue)
-    const club = String(clubValue || '').trim()
+  const [governorIdPart, regionIdPart, encodedRegionName = '', encodedGovernorName = ''] = selection.split('::')
 
-    if (region === '' || club === '') {
-      return
-    }
-
-    nextMap[region].add(club)
+  return {
+    selection,
+    governorId: Number(governorIdPart || 0) || 0,
+    regionId: Number(regionIdPart || 0) || 0,
+    regionName: decodeUriComponentSafe(encodedRegionName).trim(),
+    governorName: decodeUriComponentSafe(encodedGovernorName).trim(),
   }
+}
+
+function buildGovernorRegionCatalog(governors = []) {
+  const byKey = {}
 
   governors.forEach((governor) => {
+    const governorId = Number(governor?.id ?? governor?.governor_id ?? 0) || 0
+    const governorName = String(governor?.name || governor?.governor_name || '').trim()
     const governorRegions = Array.isArray(governor?.regions) ? governor.regions : []
 
     governorRegions.forEach((regionItem) => {
-      const regionName = ensureRegion(regionItem?.name)
-      const regionClubs = Array.isArray(regionItem?.clubs) ? regionItem.clubs : []
+      const regionName = String(regionItem?.name || regionItem?.region_name || '').trim()
+      const regionKey = normalizeLookupKey(regionName)
+      const regionId = Number(regionItem?.id ?? regionItem?.region_id ?? 0) || 0
 
+      if (regionKey === '') {
+        return
+      }
+
+      if (!byKey[regionKey]) {
+        byKey[regionKey] = {
+          id: regionId,
+          name: regionName,
+          governorId,
+          governorName,
+          clubsByKey: {},
+        }
+      } else {
+        if (byKey[regionKey].id <= 0 && regionId > 0) {
+          byKey[regionKey].id = regionId
+        }
+
+        if (byKey[regionKey].governorId <= 0 && governorId > 0) {
+          byKey[regionKey].governorId = governorId
+          byKey[regionKey].governorName = governorName
+        }
+      }
+
+      const regionClubs = Array.isArray(regionItem?.clubs) ? regionItem.clubs : []
       regionClubs.forEach((clubItem) => {
-        registerClub(regionName, clubItem?.name)
+        const clubName = String(clubItem?.name || clubItem?.club_name || '').trim()
+        const clubKey = normalizeLookupKey(clubName)
+
+        if (clubKey === '') {
+          return
+        }
+
+        if (!byKey[regionKey].clubsByKey[clubKey]) {
+          byKey[regionKey].clubsByKey[clubKey] = clubName
+        }
       })
     })
   })
 
-  members.forEach((member) => {
-    const region = String(member?.region || member?.eagles_region || '').trim()
-    const club = String(member?.club || member?.eagles_club || '').trim()
-
-    ensureRegion(region)
-    registerClub(region, club)
-  })
-
-  return Object.fromEntries(
-    sortLabels(Object.keys(nextMap)).map((region) => [
-      region,
-      sortLabels(Array.from(nextMap[region] || [])),
-    ]),
+  const regionNames = sortLabels(
+    Object.values(byKey)
+      .map((regionEntry) => String(regionEntry?.name || '').trim())
+      .filter(Boolean),
   )
+
+  const regionClubMap = Object.fromEntries(
+    regionNames.map((regionName) => {
+      const regionEntry = byKey[normalizeLookupKey(regionName)]
+      return [regionName, sortLabels(Object.values(regionEntry?.clubsByKey || {}))]
+    }),
+  )
+
+  return {
+    byKey,
+    regionClubMap,
+  }
 }
 
 function resolveNewsImageAsset(item) {
@@ -180,6 +252,19 @@ function normalizeMemberStatus(value) {
 function normalizeAppointedForAdmin(items = []) {
   if (!Array.isArray(items)) {
     return []
+  }
+
+  const hasNestedShape = items.some((item) => Array.isArray(item?.committees))
+  if (!hasNestedShape) {
+    return items.map((item, index) => ({
+      id: String(item?.id || `appointed-${index + 1}`).trim(),
+      name: String(item?.name || '').trim(),
+      position: String(item?.position || '').trim(),
+      committee: String(item?.committee || item?.club || '').trim(),
+      region: String(item?.region || '').trim(),
+      createdAt: String(item?.createdAt || item?.created_at || '').trim(),
+      updatedAt: String(item?.updatedAt || item?.updated_at || '').trim(),
+    }))
   }
 
   const rows = []
@@ -323,8 +408,10 @@ function App() {
   const [form, setForm] = useState({ username: '', password: '' })
   const [busy, setBusy] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [collectionsResolved, setCollectionsResolved] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [idlePromptOpen, setIdlePromptOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobileView, setIsMobileView] = useState(() => {
     if (typeof window === 'undefined') {
@@ -344,6 +431,13 @@ function App() {
   const [openGroups, setOpenGroups] = useState(initialSidebarGroups(initialPage))
   const [actionModal, setActionModal] = useState(null)
   const [actionBusy, setActionBusy] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmLabel: 'Delete',
+    onConfirm: null,
+  })
   const [newsComposer, setNewsComposer] = useState({
     id: '',
     title: '',
@@ -382,9 +476,37 @@ function App() {
     id: '',
     name: '',
     position: '',
+    full_position: '',
     image: null,
     imageUrl: '',
     imageFilename: '',
+  })
+  const [governorComposer, setGovernorComposer] = useState({
+    id: '',
+    name: '',
+    image: null,
+    imageUrl: '',
+    imageFilename: '',
+  })
+  const [appointedComposer, setAppointedComposer] = useState({
+    id: '',
+    name: '',
+    position: '',
+    committee: '',
+    region: '',
+  })
+  const [pastLeaderComposer, setPastLeaderComposer] = useState({
+    id: '',
+    name: '',
+    position: '',
+    term_start: '',
+    term_end: '',
+    achievements: '',
+    order_priority: '0',
+    is_active: '1',
+    photo: null,
+    photoUrl: '',
+    photoFilename: '',
   })
   const [memberComposer, setMemberComposer] = useState({
     id: '',
@@ -397,6 +519,15 @@ function App() {
     photo: null,
     photoUrl: '',
     dateAdded: '',
+  })
+  const [regionClubComposer, setRegionClubComposer] = useState({
+    setup_action: 'add_club',
+    governor_selection: '',
+    governor_id: '',
+    governor_name: '',
+    region_id: '',
+    region_name: '',
+    club_name: '',
   })
   const [memorandumComposer, setMemorandumComposer] = useState({
     id: '',
@@ -430,8 +561,42 @@ function App() {
   const isSidebarVisible = isMobileView ? sidebarOpen : !sidebarCollapsed
 
   const isSuperAdmin = resolveAdminRoleId(user) === 1
-  const regionClubMap = buildRegionClubMap(collections.members, collections.governors)
+  const governorRegionCatalog = buildGovernorRegionCatalog(collections.governors)
+  const regionCatalogByKey = governorRegionCatalog.byKey
+  const regionClubMap = governorRegionCatalog.regionClubMap
   const regions = Object.keys(regionClubMap)
+
+  function resolveRegionEntry(value) {
+    const key = normalizeLookupKey(value)
+    if (key === '') {
+      return null
+    }
+
+    return regionCatalogByKey[key] || null
+  }
+
+  function resolveRegionName(value) {
+    const trimmedValue = String(value || '').trim()
+    if (trimmedValue === '') {
+      return trimmedValue
+    }
+
+    return String(resolveRegionEntry(trimmedValue)?.name || trimmedValue).trim()
+  }
+
+  function resolveClubName(regionValue, clubValue) {
+    const trimmedClub = String(clubValue || '').trim()
+    if (trimmedClub === '') {
+      return trimmedClub
+    }
+
+    const regionEntry = resolveRegionEntry(regionValue)
+    if (!regionEntry) {
+      return trimmedClub
+    }
+
+    return String(regionEntry.clubsByKey[normalizeLookupKey(trimmedClub)] || trimmedClub).trim()
+  }
 
   function resetNewsComposer() {
     setNewsComposer({
@@ -481,9 +646,46 @@ function App() {
       id: '',
       name: '',
       position: '',
+      full_position: '',
       image: null,
       imageUrl: '',
       imageFilename: '',
+    })
+  }
+
+  function resetGovernorComposer() {
+    setGovernorComposer({
+      id: '',
+      name: '',
+      image: null,
+      imageUrl: '',
+      imageFilename: '',
+    })
+  }
+
+  function resetAppointedComposer() {
+    setAppointedComposer({
+      id: '',
+      name: '',
+      position: '',
+      committee: '',
+      region: '',
+    })
+  }
+
+  function resetPastLeaderComposer() {
+    setPastLeaderComposer({
+      id: '',
+      name: '',
+      position: '',
+      term_start: '',
+      term_end: '',
+      achievements: '',
+      order_priority: '0',
+      is_active: '1',
+      photo: null,
+      photoUrl: '',
+      photoFilename: '',
     })
   }
 
@@ -499,6 +701,18 @@ function App() {
       photo: null,
       photoUrl: '',
       dateAdded: '',
+    })
+  }
+
+  function resetRegionClubComposer() {
+    setRegionClubComposer({
+      setup_action: 'add_club',
+      governor_selection: '',
+      governor_id: '',
+      governor_name: '',
+      region_id: '',
+      region_name: '',
+      club_name: '',
     })
   }
 
@@ -638,6 +852,7 @@ function App() {
           setNotice('Dashboard updated successfully.')
         }
       }
+      setCollectionsResolved(true)
     } catch (loadError) {
       if (loadError.status === 401) {
         startTransition(() => {
@@ -653,6 +868,7 @@ function App() {
       }
 
       setError(loadError.message || 'Unable to load the dashboard right now.')
+      setCollectionsResolved(true)
     } finally {
       if (!silent) {
         setRefreshing(false)
@@ -688,6 +904,7 @@ function App() {
             setCollections(emptyCollections)
             setModuleErrors({})
           })
+          setCollectionsResolved(false)
           return
         }
 
@@ -750,6 +967,44 @@ function App() {
 
   useEffect(() => {
     if (!user) {
+      setIdlePromptOpen(false)
+    }
+  }, [user])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined
+    }
+
+    if (!user || authChecking || idlePromptOpen) {
+      return undefined
+    }
+
+    let timeoutId = window.setTimeout(() => {
+      setIdlePromptOpen(true)
+    }, INACTIVITY_WARNING_MS)
+
+    const resetInactivityTimer = () => {
+      window.clearTimeout(timeoutId)
+      timeoutId = window.setTimeout(() => {
+        setIdlePromptOpen(true)
+      }, INACTIVITY_WARNING_MS)
+    }
+
+    INACTIVITY_EVENTS.forEach((eventName) => {
+      window.addEventListener(eventName, resetInactivityTimer)
+    })
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      INACTIVITY_EVENTS.forEach((eventName) => {
+        window.removeEventListener(eventName, resetInactivityTimer)
+      })
+    }
+  }, [user, authChecking, idlePromptOpen])
+
+  useEffect(() => {
+    if (!user) {
       return
     }
 
@@ -805,6 +1060,7 @@ function App() {
 
     try {
       setBusy(true)
+      setCollectionsResolved(false)
       setError('')
       setNotice('')
 
@@ -818,9 +1074,7 @@ function App() {
         body: JSON.stringify(form),
       })
 
-      startTransition(() => {
-        setUser(payload.user || null)
-      })
+      setUser(payload.user || null)
 
       await runAdminRefresh({ silent: true })
       setForm({ username: '', password: '' })
@@ -850,6 +1104,7 @@ function App() {
         setCollections(emptyCollections)
         setModuleErrors({})
       })
+      setCollectionsResolved(false)
       setSidebarOpen(false)
       setActionModal(null)
       setActivePage('dashboard')
@@ -860,6 +1115,16 @@ function App() {
     } finally {
       setBusy(false)
     }
+  }
+
+  function handleContinueSession() {
+    setIdlePromptOpen(false)
+    setNotice('Session continued.')
+  }
+
+  async function handleIdleLogout() {
+    setIdlePromptOpen(false)
+    await handleLogout()
   }
 
   function dismissBanner() {
@@ -894,8 +1159,11 @@ function App() {
   }
 
   function openActionModal(mode) {
-    if (['member', 'editMember', 'memberImport'].includes(mode) && !isSuperAdmin) {
-      setError('Only super admins can manage members.')
+    if (
+      ['member', 'editMember', 'memberImport', 'regionClub', 'appointed', 'editAppointed', 'pastLeader', 'editPastLeader'].includes(mode)
+      && !isSuperAdmin
+    ) {
+      setError('Only super admins can manage this section.')
       return
     }
 
@@ -924,8 +1192,32 @@ function App() {
       resetMemberImportForm()
     }
 
+    if (mode === 'regionClub') {
+      resetRegionClubComposer()
+    }
+
     if (mode === 'editOfficer') {
       resetOfficerComposer()
+    }
+
+    if (mode === 'editGovernor') {
+      resetGovernorComposer()
+    }
+
+    if (mode === 'appointed') {
+      resetAppointedComposer()
+    }
+
+    if (mode === 'editAppointed') {
+      resetAppointedComposer()
+    }
+
+    if (mode === 'pastLeader') {
+      resetPastLeaderComposer()
+    }
+
+    if (mode === 'editPastLeader') {
+      resetPastLeaderComposer()
     }
 
     if (mode === 'memorandum') {
@@ -1020,10 +1312,14 @@ function App() {
   }
 
   function openOfficerEditor(item) {
+    const normalizedPosition = String(item?.position || item?.designation || '').trim()
+    const normalizedFullPosition = String(item?.fullPosition || item?.full_position || normalizedPosition).trim()
+
     setOfficerComposer({
       id: String(item?.id || '').trim(),
       name: String(item?.name || item?.fullName || '').trim(),
-      position: String(item?.position || item?.designation || '').trim(),
+      position: normalizedPosition,
+      full_position: normalizedFullPosition,
       image: null,
       imageUrl: String(item?.imageUrl || item?.photoUrl || '').trim(),
       imageFilename: String(item?.imageFilename || '').trim(),
@@ -1031,14 +1327,58 @@ function App() {
     setActionModal('editOfficer')
   }
 
+  function openGovernorEditor(item) {
+    setGovernorComposer({
+      id: String(item?.id || item?.governor_id || '').trim(),
+      name: String(item?.name || item?.governor_name || '').trim(),
+      image: null,
+      imageUrl: String(item?.imageUrl || item?.photoUrl || '').trim(),
+      imageFilename: String(item?.imageFilename || item?.governor_image || '').trim(),
+    })
+    setActionModal('editGovernor')
+  }
+
+  function openAppointedEditor(item) {
+    setAppointedComposer({
+      id: String(item?.id || '').trim(),
+      name: String(item?.name || '').trim(),
+      position: String(item?.position || '').trim(),
+      committee: String(item?.committee || item?.club || '').trim(),
+      region: String(item?.region || '').trim(),
+    })
+    setActionModal('editAppointed')
+  }
+
+  function openPastLeaderEditor(item) {
+    setPastLeaderComposer({
+      id: String(item?.id || '').trim(),
+      name: String(item?.name || '').trim(),
+      position: String(item?.position || '').trim(),
+      term_start: String(item?.termStart || item?.term_start || '').trim(),
+      term_end: String(item?.termEnd || item?.term_end || '').trim(),
+      achievements: String(item?.achievements || '').trim(),
+      order_priority: String(item?.orderPriority ?? item?.order_priority ?? 0),
+      is_active: String(item?.is_active ?? (item?.isActive ? 1 : 0) ?? 1),
+      photo: null,
+      photoUrl: String(item?.photoUrl || item?.imageUrl || '').trim(),
+      photoFilename: String(item?.photoFilename || item?.photo || '').trim(),
+    })
+    setActionModal('editPastLeader')
+  }
+
   function openMemberEditor(item) {
+    const incomingRegion = String(item?.region || item?.eagles_region || '').trim()
+    const normalizedRegion = resolveRegionName(incomingRegion)
+    const incomingClub = String(item?.club || item?.eagles_club || '').trim()
+    const normalizedClub = resolveClubName(normalizedRegion, incomingClub)
+
     setMemberComposer({
       id: String(item?.id || item?.eagles_id || '').trim(),
       first_name: String(item?.firstName || item?.first_name || '').trim(),
       last_name: String(item?.lastName || item?.last_name || '').trim(),
       position: String(item?.position || item?.eagles_position || '').trim(),
-      club: String(item?.club || item?.eagles_club || '').trim(),
-      region: String(item?.region || item?.eagles_region || '').trim(),
+      club: normalizedClub,
+      region: normalizedRegion,
       status: normalizeMemberStatus(item?.status || item?.eagles_status || 'ACTIVE'),
       photo: null,
       photoUrl: String(item?.picUrl || item?.photoUrl || '').trim(),
@@ -1068,6 +1408,49 @@ function App() {
     setActionModal(null)
   }
 
+  function openDeleteConfirm({ title, message, confirmLabel = 'Delete', onConfirm }) {
+    if (typeof onConfirm !== 'function') {
+      return
+    }
+
+    setDeleteConfirm({
+      open: true,
+      title: String(title || 'Delete record?').trim() || 'Delete record?',
+      message: String(message || 'This action cannot be undone.').trim() || 'This action cannot be undone.',
+      confirmLabel: String(confirmLabel || 'Delete').trim() || 'Delete',
+      onConfirm,
+    })
+  }
+
+  function closeDeleteConfirm(force = false) {
+    if (actionBusy && !force) {
+      return
+    }
+
+    setDeleteConfirm({
+      open: false,
+      title: '',
+      message: '',
+      confirmLabel: 'Delete',
+      onConfirm: null,
+    })
+  }
+
+  async function confirmDeleteAction() {
+    const handler = deleteConfirm?.onConfirm
+    closeDeleteConfirm(true)
+
+    if (typeof handler !== 'function') {
+      return
+    }
+
+    try {
+      await handler()
+    } catch (confirmError) {
+      setError(confirmError instanceof Error ? confirmError.message : 'Unable to complete delete action.')
+    }
+  }
+
   function updateNewsComposer(field, value) {
     setNewsComposer((current) => ({ ...current, [field]: value }))
   }
@@ -1084,6 +1467,18 @@ function App() {
     setOfficerComposer((current) => ({ ...current, [field]: value }))
   }
 
+  function updateGovernorComposer(field, value) {
+    setGovernorComposer((current) => ({ ...current, [field]: value }))
+  }
+
+  function updateAppointedComposer(field, value) {
+    setAppointedComposer((current) => ({ ...current, [field]: value }))
+  }
+
+  function updatePastLeaderComposer(field, value) {
+    setPastLeaderComposer((current) => ({ ...current, [field]: value }))
+  }
+
   function updateMemberComposer(field, value) {
     setMemberComposer((current) => {
       if (field === 'status') {
@@ -1091,15 +1486,19 @@ function App() {
       }
 
       if (field === 'region') {
-        const nextRegion = String(value || '').trim()
+        const nextRegion = resolveRegionName(String(value || '').trim())
         const availableClubs = regionClubMap[nextRegion] || []
-        const currentClub = String(current.club || '').trim()
+        const currentClub = resolveClubName(nextRegion, String(current.club || '').trim())
 
         return {
           ...current,
           region: nextRegion,
           club: availableClubs.includes(currentClub) ? currentClub : '',
         }
+      }
+
+      if (field === 'club') {
+        return { ...current, club: resolveClubName(current.region, String(value || '').trim()) }
       }
 
       return { ...current, [field]: value }
@@ -1120,6 +1519,68 @@ function App() {
 
   function updateMemberImportForm(field, value) {
     setMemberImportForm((current) => ({ ...current, [field]: value }))
+  }
+
+  function updateRegionClubComposer(field, value) {
+    setRegionClubComposer((current) => {
+      if (field === 'governor_selection') {
+        const nextValue = String(value || '').trim()
+
+        if (nextValue === '__NEW__') {
+          return {
+            ...current,
+            setup_action: 'add_club',
+            governor_selection: '__NEW__',
+            governor_id: '__NEW__',
+            governor_name: '',
+            region_id: '',
+            region_name: '',
+            club_name: '',
+          }
+        }
+
+        if (nextValue === '') {
+          return {
+            ...current,
+            setup_action: 'add_club',
+            governor_selection: '',
+            governor_id: '',
+            governor_name: '',
+            region_id: '',
+            region_name: '',
+            club_name: '',
+          }
+        }
+
+        const parsedSelection = parseGovernorSelection(nextValue)
+        const parsedGovernorId = parsedSelection.governorId
+        const parsedRegionId = parsedSelection.regionId
+        const parsedRegionName = parsedSelection.regionName
+        const parsedGovernorName = parsedSelection.governorName
+
+        return {
+          ...current,
+          setup_action: 'add_club',
+          governor_selection: nextValue,
+          governor_id: parsedGovernorId > 0 ? String(parsedGovernorId) : '',
+          governor_name: parsedGovernorName,
+          region_id: parsedRegionId > 0 ? String(parsedRegionId) : '',
+          region_name: parsedRegionName,
+          club_name: '',
+        }
+      }
+
+      if (field === 'setup_action') {
+        const nextAction = String(value || '').trim()
+        if (nextAction === 'rename_region') {
+          return { ...current, setup_action: 'rename_region', club_name: '' }
+        }
+
+        return { ...current, setup_action: 'add_club' }
+      }
+
+      return { ...current, [field]: value }
+    })
   }
 
   async function handleSaveNews(event) {
@@ -1182,21 +1643,32 @@ function App() {
       setError('')
       setNotice('')
 
-      const trimmedRegion = String(memberComposer.region || '').trim()
-      const trimmedClub = String(memberComposer.club || '').trim()
-      const allowedClubs = regionClubMap[trimmedRegion] || []
+      const effectiveRegion = resolveRegionName(String(memberComposer.region || '').trim())
+      const effectiveClub = resolveClubName(effectiveRegion, String(memberComposer.club || '').trim())
+      const hasStructuredRegions = Object.keys(regionCatalogByKey).length > 0
 
-      if (trimmedRegion === '') {
+      if (effectiveRegion === '') {
         setError('Please choose a region first.')
         return
       }
 
-      if (trimmedClub === '') {
+      if (hasStructuredRegions && !resolveRegionEntry(effectiveRegion)) {
+        setError('Selected region is not encoded yet. Please encode region and club first before adding a member.')
+        return
+      }
+
+      if (effectiveClub === '') {
         setError('Please choose a club for the selected region.')
         return
       }
 
-      if (allowedClubs.length > 0 && !allowedClubs.includes(trimmedClub)) {
+      const allowedClubs = regionClubMap[effectiveRegion] || []
+      if (allowedClubs.length === 0) {
+        setError('No clubs are encoded for this region yet. Please encode club first before adding a member.')
+        return
+      }
+
+      if (!allowedClubs.includes(effectiveClub)) {
         setError('Please choose a club that belongs to the selected region.')
         return
       }
@@ -1208,8 +1680,8 @@ function App() {
       formData.append('first_name', memberComposer.first_name)
       formData.append('last_name', memberComposer.last_name)
       formData.append('position', memberComposer.position)
-      formData.append('club', trimmedClub)
-      formData.append('region', trimmedRegion)
+      formData.append('club', effectiveClub)
+      formData.append('region', effectiveRegion)
       formData.append('status', normalizeMemberStatus(memberComposer.status))
       if (memberComposer.photo) {
         formData.append('photo', memberComposer.photo)
@@ -1234,6 +1706,181 @@ function App() {
       resetMemberComposer()
     } catch (createError) {
       setError(createError.message || 'Unable to save the member.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  async function handleSaveRegionClub(event) {
+    event.preventDefault()
+
+    if (!isSuperAdmin) {
+      setError('Only super admins can manage members.')
+      return
+    }
+
+    try {
+      setActionBusy(true)
+      setError('')
+      setNotice('')
+
+      const selectedGovernorSelection = String(regionClubComposer.governor_selection || '').trim()
+      const selectedGovernorPair = parseGovernorSelection(selectedGovernorSelection)
+      const setupAction = String(regionClubComposer.setup_action || 'add_club').trim()
+      const selectedGovernor = String(regionClubComposer.governor_id || '').trim()
+      const newGovernorName = String(regionClubComposer.governor_name || '').trim()
+      const selectedRegionId = Number(regionClubComposer.region_id || 0) || 0
+      const regionName = String(regionClubComposer.region_name || '').trim()
+      const clubName = String(regionClubComposer.club_name || '').trim()
+      const renameExistingRegion = setupAction === 'rename_region' && selectedRegionId > 0
+      let governorId = Number(selectedGovernor || 0) || 0
+      let normalizedGovernorName = String(regionClubComposer.governor_name || '').trim()
+      let createdGovernor = false
+      let regionId = selectedRegionId
+      let normalizedRegionName = regionName
+
+      if (selectedGovernor === '__NEW__') {
+        if (newGovernorName === '') {
+          setError('Governor name is required when adding a new governor.')
+          return
+        }
+
+        const governorPayload = await requestJson(ADMIN_GOVERNORS_CREATE_ENDPOINT, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({
+            name: newGovernorName,
+          }),
+        })
+
+        governorId = Number(governorPayload?.data?.id || governorPayload?.data?.governor_id || 0) || 0
+        normalizedGovernorName = String(governorPayload?.data?.name || newGovernorName).trim() || newGovernorName
+        createdGovernor = governorId > 0
+      }
+
+      if (governorId <= 0) {
+        setError('Please choose a governor.')
+        return
+      }
+
+      if (selectedGovernorSelection !== '__NEW__' && regionId > 0 && clubName === '' && !renameExistingRegion) {
+        setError('Please enter a club name under the selected governor and region.')
+        return
+      }
+
+      if (regionId <= 0 && regionName === '') {
+        if (createdGovernor && clubName === '') {
+          await runAdminRefresh({ silent: true })
+          setActivePage('members')
+          setOpenGroups((current) => ({ ...current, members: true }))
+          setNotice(`Saved governor ${normalizedGovernorName} successfully.`)
+          closeActionModal(true)
+          resetRegionClubComposer()
+          return
+        }
+
+        setError('Region name is required to save region or club.')
+        return
+      }
+
+      if (renameExistingRegion) {
+        if (regionName === '') {
+          setError('Updated region name is required.')
+          return
+        }
+
+        const regionPayload = await requestJson(ADMIN_REGIONS_UPDATE_ENDPOINT, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({
+            id: regionId,
+            name: regionName,
+            governor_id: governorId,
+          }),
+        })
+
+        normalizedRegionName = String(regionPayload?.data?.name || regionName).trim() || regionName
+
+        await runAdminRefresh({ silent: true })
+        setActivePage('members')
+        setOpenGroups((current) => ({ ...current, members: true }))
+        if (normalizedRegionName !== '' && selectedGovernorPair.regionName !== '') {
+          setNotice(`Updated region ${selectedGovernorPair.regionName} to ${normalizedRegionName} successfully.`)
+        } else {
+          setNotice(`Updated region ${normalizedRegionName} successfully.`)
+        }
+        closeActionModal(true)
+        resetRegionClubComposer()
+        return
+      }
+
+      if (regionId <= 0) {
+        const regionPayload = await requestJson(ADMIN_REGIONS_CREATE_ENDPOINT, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({
+            name: regionName,
+            governor_id: governorId,
+          }),
+        })
+
+        regionId = Number(regionPayload?.data?.id || 0) || 0
+        normalizedRegionName = String(regionPayload?.data?.name || regionName).trim() || regionName
+      }
+
+      let normalizedClubName = ''
+
+      if (clubName !== '') {
+        if (regionId <= 0) {
+          setError('Region was not linked correctly. Please try again.')
+          return
+        }
+
+        const clubPayload = await requestJson(ADMIN_CLUBS_CREATE_ENDPOINT, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({
+            name: clubName,
+            region_id: regionId,
+            governor_id: governorId,
+          }),
+        })
+
+        normalizedClubName = String(clubPayload?.data?.name || clubName).trim()
+      }
+
+      await runAdminRefresh({ silent: true })
+      setActivePage('members')
+      setOpenGroups((current) => ({ ...current, members: true }))
+      if (createdGovernor && normalizedClubName !== '') {
+        setNotice(`Saved governor ${normalizedGovernorName}, region ${normalizedRegionName}, and club ${normalizedClubName}.`)
+      } else if (createdGovernor) {
+        setNotice(`Saved governor ${normalizedGovernorName} and region ${normalizedRegionName}.`)
+      } else if (normalizedClubName !== '') {
+        setNotice(`Saved ${normalizedGovernorName || 'Governor'} - ${normalizedRegionName} / ${normalizedClubName} successfully.`)
+      } else {
+        setNotice(`Saved region ${normalizedRegionName} successfully.`)
+      }
+      closeActionModal(true)
+      resetRegionClubComposer()
+    } catch (saveError) {
+      setError(saveError.message || 'Unable to save region or club right now.')
     } finally {
       setActionBusy(false)
     }
@@ -1376,7 +2023,7 @@ function App() {
     }
   }
 
-  async function handleDeleteEvent(item) {
+  function handleDeleteEvent(item) {
     const eventId = String(item?.id || item?.eventId || '').trim()
     if (eventId === '') {
       setError('A valid event ID is required.')
@@ -1384,34 +2031,37 @@ function App() {
     }
 
     const label = String(item?.title || item?.name || 'this event').trim() || 'this event'
-    if (typeof window !== 'undefined' && !window.confirm(`Delete "${label}"?`)) {
-      return
-    }
+    openDeleteConfirm({
+      title: 'Delete Event?',
+      message: `Delete "${label}" permanently? This action cannot be undone.`,
+      confirmLabel: 'Delete Event',
+      onConfirm: async () => {
+        try {
+          setActionBusy(true)
+          setError('')
+          setNotice('')
 
-    try {
-      setActionBusy(true)
-      setError('')
-      setNotice('')
+          await requestJson(ADMIN_EVENTS_DELETE_ENDPOINT, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ id: eventId }),
+          })
 
-      await requestJson(ADMIN_EVENTS_DELETE_ENDPOINT, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ id: eventId }),
-      })
-
-      await runAdminRefresh({ silent: true })
-      setActivePage('events')
-      setOpenGroups((current) => ({ ...current, content: true }))
-      setNotice('Event deleted successfully.')
-    } catch (deleteError) {
-      setError(deleteError.message || 'Unable to delete the event.')
-    } finally {
-      setActionBusy(false)
-    }
+          await runAdminRefresh({ silent: true })
+          setActivePage('events')
+          setOpenGroups((current) => ({ ...current, content: true }))
+          setNotice('Event deleted successfully.')
+        } catch (deleteError) {
+          setError(deleteError.message || 'Unable to delete the event.')
+        } finally {
+          setActionBusy(false)
+        }
+      },
+    })
   }
 
   async function handleSaveOfficer(event) {
@@ -1425,6 +2075,7 @@ function App() {
       const officerId = String(officerComposer.id || '').trim()
       const trimmedName = String(officerComposer.name || '').trim()
       const trimmedPosition = String(officerComposer.position || '').trim()
+      const trimmedFullPosition = String(officerComposer.full_position || '').trim()
 
       if (officerId === '') {
         setError('Officer ID is required.')
@@ -1440,7 +2091,7 @@ function App() {
       formData.append('id', officerId)
       formData.append('name', trimmedName)
       formData.append('position', trimmedPosition)
-      formData.append('full_position', trimmedPosition)
+      formData.append('full_position', trimmedFullPosition || trimmedPosition)
       if (officerComposer.image) {
         formData.append('image', officerComposer.image)
       }
@@ -1463,6 +2114,349 @@ function App() {
     } finally {
       setActionBusy(false)
     }
+  }
+
+  async function handleSaveGovernor(event) {
+    event.preventDefault()
+
+    if (!isSuperAdmin) {
+      setError('Only super admins can update governors.')
+      return
+    }
+
+    try {
+      setActionBusy(true)
+      setError('')
+      setNotice('')
+
+      const governorId = String(governorComposer.id || '').trim()
+      const trimmedName = String(governorComposer.name || '').trim()
+
+      if (governorId === '') {
+        setError('Governor ID is required.')
+        return
+      }
+
+      if (trimmedName === '') {
+        setError('Governor name is required.')
+        return
+      }
+
+      const formData = new FormData()
+      formData.append('id', governorId)
+      formData.append('name', trimmedName)
+      if (governorComposer.image) {
+        formData.append('image', governorComposer.image)
+      }
+
+      await requestJson(ADMIN_GOVERNORS_UPDATE_ENDPOINT, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData,
+      })
+
+      await runAdminRefresh({ silent: true })
+      setActivePage('governors')
+      setOpenGroups((current) => ({ ...current, leadership: true }))
+      setNotice('Governor updated successfully.')
+      closeActionModal(true)
+      resetGovernorComposer()
+    } catch (saveError) {
+      setError(saveError.message || 'Unable to save the governor.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  async function handleSaveAppointed(event) {
+    event.preventDefault()
+
+    if (!isSuperAdmin) {
+      setError('Only super admins can manage appointed officers.')
+      return
+    }
+
+    try {
+      setActionBusy(true)
+      setError('')
+      setNotice('')
+
+      const isEditingAppointed = actionModal === 'editAppointed'
+      const appointedId = String(appointedComposer.id || '').trim()
+      const trimmedName = String(appointedComposer.name || '').trim()
+      const trimmedPosition = String(appointedComposer.position || '').trim()
+      const trimmedCommittee = String(appointedComposer.committee || '').trim()
+      const trimmedRegion = String(appointedComposer.region || '').trim()
+
+      if (isEditingAppointed && appointedId === '') {
+        setError('A valid appointed officer ID is required.')
+        return
+      }
+
+      if (trimmedName === '' || trimmedPosition === '' || trimmedCommittee === '' || trimmedRegion === '') {
+        setError('Name, position, committee, and region are required.')
+        return
+      }
+
+      const endpoint = isEditingAppointed
+        ? ADMIN_APPOINTED_UPDATE_ENDPOINT
+        : ADMIN_APPOINTED_CREATE_ENDPOINT
+
+      const payload = {
+        name: trimmedName,
+        position: trimmedPosition,
+        committee: trimmedCommittee,
+        region: trimmedRegion,
+      }
+
+      if (isEditingAppointed) {
+        payload.id = appointedId
+      }
+
+      await requestJson(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      await runAdminRefresh({ silent: true })
+      setActivePage('appointed')
+      setOpenGroups((current) => ({ ...current, leadership: true }))
+      setNotice(isEditingAppointed ? 'Appointed officer updated successfully.' : 'Appointed officer added successfully.')
+      closeActionModal(true)
+      resetAppointedComposer()
+    } catch (saveError) {
+      setError(saveError.message || 'Unable to save the appointed officer.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  async function handleSavePastLeader(event) {
+    event.preventDefault()
+
+    if (!isSuperAdmin) {
+      setError('Only super admins can manage past leaders.')
+      return
+    }
+
+    try {
+      setActionBusy(true)
+      setError('')
+      setNotice('')
+
+      const isEditingPastLeader = actionModal === 'editPastLeader'
+      const pastLeaderId = String(pastLeaderComposer.id || '').trim()
+      const trimmedName = String(pastLeaderComposer.name || '').trim()
+      const trimmedPosition = String(pastLeaderComposer.position || '').trim()
+      const termStart = Number(pastLeaderComposer.term_start || 0) || 0
+      const termEnd = Number(pastLeaderComposer.term_end || 0) || 0
+      const achievements = String(pastLeaderComposer.achievements || '').trim()
+      const orderPriority = Number(pastLeaderComposer.order_priority || 0) || 0
+      const isActive = String(pastLeaderComposer.is_active ?? '1').trim() === '1' ? '1' : '0'
+
+      if (isEditingPastLeader && pastLeaderId === '') {
+        setError('A valid past leader ID is required.')
+        return
+      }
+
+      if (trimmedName === '' || trimmedPosition === '') {
+        setError('Name and position are required.')
+        return
+      }
+
+      if (termStart < 1900 || termStart > 2100 || termEnd < 1900 || termEnd > 2100) {
+        setError('Term start and term end must be valid years.')
+        return
+      }
+
+      if (termEnd < termStart) {
+        setError('Term end cannot be earlier than term start.')
+        return
+      }
+
+      const formData = new FormData()
+      if (isEditingPastLeader) {
+        formData.append('id', pastLeaderId)
+      }
+      formData.append('name', trimmedName)
+      formData.append('position', trimmedPosition)
+      formData.append('term_start', String(termStart))
+      formData.append('term_end', String(termEnd))
+      formData.append('achievements', achievements)
+      formData.append('order_priority', String(orderPriority))
+      formData.append('is_active', isActive)
+      if (pastLeaderComposer.photo) {
+        formData.append('photo', pastLeaderComposer.photo)
+      }
+
+      const endpoint = isEditingPastLeader
+        ? ADMIN_PAST_LEADERS_UPDATE_ENDPOINT
+        : ADMIN_PAST_LEADERS_CREATE_ENDPOINT
+
+      await requestJson(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: formData,
+      })
+
+      await runAdminRefresh({ silent: true })
+      setActivePage('pastLeaders')
+      setOpenGroups((current) => ({ ...current, leadership: true }))
+      setNotice(isEditingPastLeader ? 'Past leader updated successfully.' : 'Past leader added successfully.')
+      closeActionModal(true)
+      resetPastLeaderComposer()
+    } catch (saveError) {
+      setError(saveError.message || 'Unable to save the past leader.')
+    } finally {
+      setActionBusy(false)
+    }
+  }
+
+  function handleDeleteGovernor(item) {
+    if (!isSuperAdmin) {
+      setError('Only super admins can delete governors.')
+      return
+    }
+
+    const governorId = String(item?.id || item?.governor_id || '').trim()
+    if (governorId === '') {
+      setError('A valid governor ID is required.')
+      return
+    }
+
+    const label = String(item?.name || item?.governor_name || 'this governor').trim() || 'this governor'
+    openDeleteConfirm({
+      title: 'Delete Governor?',
+      message: `Delete "${label}" permanently? This action cannot be undone.`,
+      confirmLabel: 'Delete Governor',
+      onConfirm: async () => {
+        try {
+          setActionBusy(true)
+          setError('')
+          setNotice('')
+
+          await requestJson(ADMIN_GOVERNORS_DELETE_ENDPOINT, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ id: governorId }),
+          })
+
+          await runAdminRefresh({ silent: true })
+          setActivePage('governors')
+          setOpenGroups((current) => ({ ...current, leadership: true }))
+          setNotice('Governor deleted successfully.')
+        } catch (deleteError) {
+          setError(deleteError.message || 'Unable to delete the governor.')
+        } finally {
+          setActionBusy(false)
+        }
+      },
+    })
+  }
+
+  function handleDeletePastLeader(item) {
+    if (!isSuperAdmin) {
+      setError('Only super admins can delete past leaders.')
+      return
+    }
+
+    const pastLeaderId = String(item?.id || '').trim()
+    if (pastLeaderId === '') {
+      setError('A valid past leader ID is required.')
+      return
+    }
+
+    const label = String(item?.name || 'this past leader').trim() || 'this past leader'
+    openDeleteConfirm({
+      title: 'Delete Past Leader?',
+      message: `Delete "${label}" permanently? This action cannot be undone.`,
+      confirmLabel: 'Delete Past Leader',
+      onConfirm: async () => {
+        try {
+          setActionBusy(true)
+          setError('')
+          setNotice('')
+
+          await requestJson(ADMIN_PAST_LEADERS_DELETE_ENDPOINT, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ id: pastLeaderId }),
+          })
+
+          await runAdminRefresh({ silent: true })
+          setActivePage('pastLeaders')
+          setOpenGroups((current) => ({ ...current, leadership: true }))
+          setNotice('Past leader deleted successfully.')
+        } catch (deleteError) {
+          setError(deleteError.message || 'Unable to delete the past leader.')
+        } finally {
+          setActionBusy(false)
+        }
+      },
+    })
+  }
+
+  function handleDeleteAppointed(item) {
+    if (!isSuperAdmin) {
+      setError('Only super admins can delete appointed officers.')
+      return
+    }
+
+    const appointedId = String(item?.id || '').trim()
+    if (appointedId === '') {
+      setError('A valid appointed officer ID is required.')
+      return
+    }
+
+    const label = String(item?.name || 'this appointed officer').trim() || 'this appointed officer'
+    openDeleteConfirm({
+      title: 'Delete Appointed Officer?',
+      message: `Delete "${label}" permanently? This action cannot be undone.`,
+      confirmLabel: 'Delete Officer',
+      onConfirm: async () => {
+        try {
+          setActionBusy(true)
+          setError('')
+          setNotice('')
+
+          await requestJson(ADMIN_APPOINTED_DELETE_ENDPOINT, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ id: appointedId }),
+          })
+
+          await runAdminRefresh({ silent: true })
+          setActivePage('appointed')
+          setOpenGroups((current) => ({ ...current, leadership: true }))
+          setNotice('Appointed officer deleted successfully.')
+        } catch (deleteError) {
+          setError(deleteError.message || 'Unable to delete the appointed officer.')
+        } finally {
+          setActionBusy(false)
+        }
+      },
+    })
   }
 
   async function handleImportMembers(event) {
@@ -1578,7 +2572,7 @@ function App() {
     }
   }
 
-  async function handleDeleteUser(item) {
+  function handleDeleteUser(item) {
     if (!isSuperAdmin) {
       setError('Only super admins can manage admin accounts.')
       return
@@ -1596,34 +2590,37 @@ function App() {
     }
 
     const label = String(item?.name || item?.username || `User ${userId}`).trim()
-    if (typeof window !== 'undefined' && !window.confirm(`Delete "${label}"?`)) {
-      return
-    }
+    openDeleteConfirm({
+      title: 'Delete User?',
+      message: `Delete "${label}" permanently? This action cannot be undone.`,
+      confirmLabel: 'Delete User',
+      onConfirm: async () => {
+        try {
+          setActionBusy(true)
+          setError('')
+          setNotice('')
 
-    try {
-      setActionBusy(true)
-      setError('')
-      setNotice('')
+          await requestJson(ADMIN_USERS_DELETE_ENDPOINT, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ id: userId }),
+          })
 
-      await requestJson(ADMIN_USERS_DELETE_ENDPOINT, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ id: userId }),
-      })
-
-      await runAdminRefresh({ silent: true })
-      setActivePage('users')
-      setOpenGroups((current) => ({ ...current, members: true }))
-      setNotice('User deleted successfully.')
-    } catch (deleteError) {
-      setError(deleteError.message || 'Unable to delete the user.')
-    } finally {
-      setActionBusy(false)
-    }
+          await runAdminRefresh({ silent: true })
+          setActivePage('users')
+          setOpenGroups((current) => ({ ...current, members: true }))
+          setNotice('User deleted successfully.')
+        } catch (deleteError) {
+          setError(deleteError.message || 'Unable to delete the user.')
+        } finally {
+          setActionBusy(false)
+        }
+      },
+    })
   }
 
   async function handleSaveMemorandum(event) {
@@ -1671,7 +2668,7 @@ function App() {
     }
   }
 
-  async function handleDeleteMemorandum(item) {
+  function handleDeleteMemorandum(item) {
     const memoId = String(item?.id || '').trim()
     if (memoId === '') {
       setError('A valid memorandum ID is required.')
@@ -1679,32 +2676,35 @@ function App() {
     }
 
     const label = String(item?.title || 'this memorandum').trim() || 'this memorandum'
-    if (typeof window !== 'undefined' && !window.confirm(`Delete "${label}"?`)) {
-      return
-    }
+    openDeleteConfirm({
+      title: 'Delete Memorandum?',
+      message: `Delete "${label}" permanently? This action cannot be undone.`,
+      confirmLabel: 'Delete Memorandum',
+      onConfirm: async () => {
+        try {
+          setActionBusy(true)
+          setError('')
+          setNotice('')
 
-    try {
-      setActionBusy(true)
-      setError('')
-      setNotice('')
+          await requestJson(ADMIN_MEMORANDUM_DELETE_ENDPOINT, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ id: memoId }),
+          })
 
-      await requestJson(ADMIN_MEMORANDUM_DELETE_ENDPOINT, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
-        },
-        body: JSON.stringify({ id: memoId }),
-      })
-
-      await runAdminRefresh({ silent: true })
-      setNotice('Memorandum deleted successfully.')
-    } catch (deleteError) {
-      setError(deleteError.message || 'Unable to delete the memorandum.')
-    } finally {
-      setActionBusy(false)
-    }
+          await runAdminRefresh({ silent: true })
+          setNotice('Memorandum deleted successfully.')
+        } catch (deleteError) {
+          setError(deleteError.message || 'Unable to delete the memorandum.')
+        } finally {
+          setActionBusy(false)
+        }
+      },
+    })
   }
 
   async function handleSaveMagnaCarta(event) {
@@ -1764,6 +2764,7 @@ function App() {
       ? 'Welcome back'
       : 'Admin update'
   const bannerIcon = error ? 'fa-circle-exclamation' : 'fa-circle-check'
+  const pageLoading = !collectionsResolved || refreshing
 
   function renderFloatingBanner() {
     if (!bannerMessage) {
@@ -1797,6 +2798,151 @@ function App() {
     )
   }
 
+  function renderProcessingBackdrop() {
+    return (
+      <Backdrop
+        open={actionBusy}
+        sx={{
+          color: '#f5f8ff',
+          zIndex: 1800,
+          backgroundColor: 'rgba(6, 15, 29, 0.52)',
+          backdropFilter: 'blur(2px)',
+        }}
+      >
+        <Box
+          sx={{
+            display: 'grid',
+            justifyItems: 'center',
+            gap: 1.25,
+            px: 3,
+            py: 2.5,
+            borderRadius: 2,
+            border: '1px solid rgba(255, 255, 255, 0.22)',
+            background: 'linear-gradient(135deg, rgba(17, 40, 74, 0.95), rgba(10, 22, 43, 0.9))',
+            boxShadow: '0 18px 44px rgba(0, 0, 0, 0.35)',
+          }}
+        >
+          <CircularProgress color="inherit" size={42} thickness={4.4} />
+          <strong style={{ fontSize: '15px', letterSpacing: '0.01em' }}>Processing request...</strong>
+          <span style={{ fontSize: '12px', opacity: 0.85 }}>Please wait</span>
+        </Box>
+      </Backdrop>
+    )
+  }
+
+  function renderInactivityPrompt() {
+    return (
+      <Backdrop
+        open={idlePromptOpen}
+        sx={{
+          color: '#f5f8ff',
+          zIndex: 1790,
+          backgroundColor: 'rgba(6, 15, 29, 0.62)',
+          backdropFilter: 'blur(2px)',
+        }}
+      >
+        <Box
+          sx={{
+            width: 'min(520px, calc(100vw - 32px))',
+            display: 'grid',
+            gap: 1.4,
+            px: { xs: 2.5, sm: 3.5 },
+            py: { xs: 2.5, sm: 3.25 },
+            borderRadius: 2.5,
+            border: '1px solid rgba(255, 255, 255, 0.24)',
+            background: 'linear-gradient(135deg, rgba(17, 40, 74, 0.96), rgba(10, 22, 43, 0.92))',
+            boxShadow: '0 22px 48px rgba(0, 0, 0, 0.38)',
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 12, letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.82 }}>
+            Session Reminder
+          </p>
+          <h3 style={{ margin: 0, fontSize: 24, lineHeight: 1.15 }}>
+            You have been inactive for 20 minutes.
+          </h3>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.6, opacity: 0.9 }}>
+            Do you want to continue your admin session or logout now?
+          </p>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.25, flexWrap: 'wrap', mt: 0.8 }}>
+            <button
+              type="button"
+              className="admin-secondary-button"
+              onClick={handleContinueSession}
+              disabled={busy || actionBusy}
+            >
+              <i className="fas fa-rotate-right" aria-hidden="true"></i>
+              Continue
+            </button>
+            <button
+              type="button"
+              className="admin-danger-button"
+              onClick={handleIdleLogout}
+              disabled={busy || actionBusy}
+            >
+              <i className="fas fa-right-from-bracket" aria-hidden="true"></i>
+              Logout
+            </button>
+          </Box>
+        </Box>
+      </Backdrop>
+    )
+  }
+
+  function renderDeleteConfirmModal() {
+    if (!deleteConfirm.open) {
+      return null
+    }
+
+    return (
+      <div className="admin-modal-backdrop admin-confirm-backdrop">
+        <div className="admin-modal admin-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="admin-delete-confirm-title">
+          <div className="admin-modal-header">
+            <div>
+              <p className="admin-modal-eyebrow">Delete Confirmation</p>
+              <h2 id="admin-delete-confirm-title">{deleteConfirm.title}</h2>
+              <p className="admin-modal-subtitle">{deleteConfirm.message}</p>
+            </div>
+
+            <button
+              type="button"
+              className="admin-icon-button"
+              onClick={() => closeDeleteConfirm()}
+              aria-label="Close confirmation"
+              disabled={actionBusy}
+            >
+              <i className="fas fa-xmark" aria-hidden="true"></i>
+            </button>
+          </div>
+
+          <div className="admin-confirm-modal__warning">
+            <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
+            <span>This delete action is permanent and cannot be undone.</span>
+          </div>
+
+          <div className="admin-modal-actions">
+            <button
+              type="button"
+              className="admin-secondary-button"
+              onClick={() => closeDeleteConfirm()}
+              disabled={actionBusy}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="admin-danger-button"
+              onClick={confirmDeleteAction}
+              disabled={actionBusy}
+            >
+              <i className="fas fa-trash" aria-hidden="true"></i>
+              {deleteConfirm.confirmLabel}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   function renderActivePage() {
     switch (activePage) {
       case 'members':
@@ -1804,6 +2950,7 @@ function App() {
           <MembersPage
             members={collections.members}
             query={query}
+            loading={pageLoading}
             isSuperAdmin={isSuperAdmin}
             onCreateMember={() => openActionModal('member')}
             onImportMembers={() => openActionModal('memberImport')}
@@ -1816,6 +2963,7 @@ function App() {
             user={user}
             users={collections.users}
             query={query}
+            loading={pageLoading}
             isSuperAdmin={isSuperAdmin}
             onCreateUser={() => openActionModal('user')}
             onEditUser={openUserEditor}
@@ -1828,6 +2976,7 @@ function App() {
             dashboard={dashboard}
             items={collections.memorandums}
             query={query}
+            loading={pageLoading}
             onCreateMemorandum={() => openActionModal('memorandum')}
             onEditMemorandum={openMemorandumEditor}
             onDeleteMemorandum={handleDeleteMemorandum}
@@ -1839,6 +2988,7 @@ function App() {
             dashboard={dashboard}
             items={collections.news}
             query={query}
+            loading={pageLoading}
             onCreateNews={() => openActionModal('news')}
             onEditNews={openNewsEditor}
           />
@@ -1848,6 +2998,7 @@ function App() {
           <VideosPage
             items={collections.videos}
             query={query}
+            loading={pageLoading}
             onCreateVideo={() => openActionModal('video')}
             onEditVideo={openVideoEditor}
           />
@@ -1857,6 +3008,7 @@ function App() {
           <EventsPage
             items={collections.events}
             query={query}
+            loading={pageLoading}
             onCreateEvent={() => openActionModal('event')}
             onEditEvent={openEventEditor}
             onDeleteEvent={handleDeleteEvent}
@@ -1867,6 +3019,7 @@ function App() {
           <MagnaCartaPage
             items={collections.magnaCarta}
             query={query}
+            loading={pageLoading}
             onCreateMagnaCarta={() => openActionModal('magnaCarta')}
             onEditMagnaCarta={openMagnaCartaEditor}
           />
@@ -1876,15 +3029,48 @@ function App() {
           <OfficersPage
             items={collections.officers}
             query={query}
+            loading={pageLoading}
             onEditOfficer={openOfficerEditor}
           />
         )
       case 'appointed':
-        return <AppointedPage items={collections.appointed} query={query} />
+        return (
+          <AppointedPage
+            items={collections.appointed}
+            query={query}
+            loading={pageLoading}
+            isSuperAdmin={isSuperAdmin}
+            onCreateAppointed={() => openActionModal('appointed')}
+            onEditAppointed={openAppointedEditor}
+            onDeleteAppointed={handleDeleteAppointed}
+          />
+        )
+      case 'pastLeaders':
+        return (
+          <PastLeadersPage
+            items={collections.pastLeaders}
+            query={query}
+            loading={pageLoading}
+            isSuperAdmin={isSuperAdmin}
+            onCreatePastLeader={() => openActionModal('pastLeader')}
+            onEditPastLeader={openPastLeaderEditor}
+            onDeletePastLeader={handleDeletePastLeader}
+          />
+        )
       case 'governors':
-        return <GovernorsPage items={collections.governors} query={query} />
+        return (
+          <GovernorsPage
+            items={collections.governors}
+            query={query}
+            loading={pageLoading}
+            isSuperAdmin={isSuperAdmin}
+            onCreateRegionClub={() => openActionModal('regionClub')}
+            onEditGovernor={openGovernorEditor}
+            onDeleteGovernor={handleDeleteGovernor}
+          />
+        )
       case 'activity':
-        return <ActivityPage dashboard={dashboard} user={user} query={query} />
+        return <ActivityPage dashboard={dashboard} user={user} query={query} loading={pageLoading} />
       case 'dashboard':
       default:
         return (
@@ -1893,12 +3079,35 @@ function App() {
             collections={collections}
             query={query}
             user={user}
+            loading={pageLoading}
             onNavigate={handlePageChange}
             onOpenQuickAction={openActionModal}
             isSuperAdmin={isSuperAdmin}
           />
         )
     }
+  }
+
+  if (authChecking && !user) {
+    return (
+      <div
+        className="admin-shell login-mode"
+        style={{ '--admin-login-bg': `url(${ADMIN_BRANDING.backgroundUrl})` }}
+      >
+        {renderFloatingBanner()}
+
+        <div className="login-stage">
+          <section className="login-card">
+            <div className="login-card__mesh" aria-hidden="true"></div>
+
+            <div className="login-loading">
+              <i className="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
+              <span>Checking existing admin session...</span>
+            </div>
+          </section>
+        </div>
+      </div>
+    )
   }
 
   if (!user) {
@@ -1953,10 +3162,10 @@ function App() {
                   <p>Use your assigned admin credentials to open the dashboard.</p>
                 </div>
 
-                {authChecking ? (
+                {busy ? (
                   <div className="login-loading">
                     <i className="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
-                    <span>Checking existing admin session...</span>
+                    <span>Signing in and preparing dashboard...</span>
                   </div>
                 ) : (
                   <form className="login-form" onSubmit={handleLogin}>
@@ -2012,6 +3221,9 @@ function App() {
   return (
     <div className={`admin-shell dashboard-mode ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       {renderFloatingBanner()}
+      {renderProcessingBackdrop()}
+      {renderInactivityPrompt()}
+      {renderDeleteConfirmModal()}
 
       <button
         className={`sidebar-toggle ${isSidebarVisible ? 'is-open' : ''}`}
@@ -2146,7 +3358,11 @@ function App() {
         onVideoSubmit={handleSaveVideo}
         onEventSubmit={handleSaveEvent}
         onOfficerSubmit={handleSaveOfficer}
+        onGovernorSubmit={handleSaveGovernor}
+        onAppointedSubmit={handleSaveAppointed}
+        onPastLeaderSubmit={handleSavePastLeader}
         onMemberSubmit={handleSaveMember}
+        onRegionClubSubmit={handleSaveRegionClub}
         onMemberImportSubmit={handleImportMembers}
         onUserSubmit={handleCreateUser}
         onMemorandumSubmit={handleSaveMemorandum}
@@ -2155,7 +3371,11 @@ function App() {
         videoForm={videoComposer}
         eventForm={eventComposer}
         officerForm={officerComposer}
+        governorForm={governorComposer}
+        appointedForm={appointedComposer}
+        pastLeaderForm={pastLeaderComposer}
         memberForm={memberComposer}
+        regionClubForm={regionClubComposer}
         memberImportForm={memberImportForm}
         userForm={userComposer}
         memorandumForm={memorandumComposer}
@@ -2164,7 +3384,11 @@ function App() {
         onVideoFieldChange={updateVideoComposer}
         onEventFieldChange={updateEventComposer}
         onOfficerFieldChange={updateOfficerComposer}
+        onGovernorFieldChange={updateGovernorComposer}
+        onAppointedFieldChange={updateAppointedComposer}
+        onPastLeaderFieldChange={updatePastLeaderComposer}
         onMemberFieldChange={updateMemberComposer}
+        onRegionClubFieldChange={updateRegionClubComposer}
         onMemberImportFieldChange={updateMemberImportForm}
         onUserFieldChange={updateUserComposer}
         onMemorandumFieldChange={updateMemorandumComposer}
@@ -2172,6 +3396,7 @@ function App() {
         submitting={actionBusy}
         regions={regions}
         regionClubMap={regionClubMap}
+        governors={collections.governors}
         isSuperAdmin={isSuperAdmin}
       />
     </div>

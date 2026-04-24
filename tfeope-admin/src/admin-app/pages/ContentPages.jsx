@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import Skeleton from '@mui/material/Skeleton'
 
 function matchesQuery(item, query) {
   if (!query) return true
@@ -127,9 +128,53 @@ function SimpleGrid({ items, renderItem, emptyLabel, emptyIcon }) {
   )
 }
 
+function LoadingSummaryValue() {
+  return <Skeleton variant="text" width={44} height={30} />
+}
+
+function LoadingSummaryHelper(width = 124) {
+  return <Skeleton variant="text" width={width} height={16} />
+}
+
+function LoadingRows({ count = 8 }) {
+  return (
+    <div style={{ display: 'grid', gap: '0.65rem' }}>
+      {Array.from({ length: count }).map((_, index) => (
+        <Skeleton key={`content-row-skeleton-${index}`} variant="rounded" height={52} />
+      ))}
+    </div>
+  )
+}
+
+function LoadingCards({ count = 4 }) {
+  return (
+    <div className="content-grid">
+      {Array.from({ length: count }).map((_, index) => (
+        <article key={`content-card-skeleton-${index}`} className="content-item-card">
+          <div className="content-item-topline">
+            <Skeleton variant="rounded" width={88} height={22} />
+            <Skeleton variant="rounded" width={86} height={34} />
+          </div>
+          <Skeleton variant="rounded" height={170} />
+          <h3><Skeleton variant="text" width="82%" height={28} /></h3>
+          <p className="content-item-text">
+            <Skeleton variant="text" width="94%" height={18} />
+            <Skeleton variant="text" width="86%" height={18} />
+          </p>
+          <div className="content-item-tags">
+            <Skeleton variant="rounded" width={120} height={24} />
+            <Skeleton variant="rounded" width={146} height={24} />
+          </div>
+        </article>
+      ))}
+    </div>
+  )
+}
+
 export function NewsPage({
   items = [],
   query = '',
+  loading = false,
   onCreateNews,
   onEditNews,
 }) {
@@ -149,6 +194,24 @@ export function NewsPage({
   useEffect(() => {
     setCurrentPage((page) => (page > totalPages ? totalPages : page))
   }, [totalPages])
+
+  if (loading) {
+    return (
+      <SectionCard
+        eyebrow="Editorial Queue"
+        title="News"
+        subtitle="Loading news items..."
+        metrics={[
+          { label: 'Published', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={92} />, tone: 'positive' },
+          { label: 'Drafts', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={110} />, tone: 'warm' },
+          { label: 'With media', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={130} />, tone: 'info' },
+        ]}
+        actions={<Skeleton variant="rounded" width={132} height={40} />}
+      >
+        <LoadingRows />
+      </SectionCard>
+    )
+  }
 
   return (
     <SectionCard
@@ -290,6 +353,7 @@ export function NewsPage({
 export function VideosPage({
   items = [],
   query = '',
+  loading = false,
   onCreateVideo,
   onEditVideo,
 }) {
@@ -309,6 +373,24 @@ export function VideosPage({
   useEffect(() => {
     setCurrentPage((page) => (page > totalPages ? totalPages : page))
   }, [totalPages])
+
+  if (loading) {
+    return (
+      <SectionCard
+        eyebrow="Media Library"
+        title="Videos"
+        subtitle="Loading video library..."
+        metrics={[
+          { label: 'Published', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={96} />, tone: 'positive' },
+          { label: 'Thumbnails', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={124} />, tone: 'info' },
+          { label: 'Linked', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={118} />, tone: 'warm' },
+        ]}
+        actions={<Skeleton variant="rounded" width={136} height={40} />}
+      >
+        <LoadingRows />
+      </SectionCard>
+    )
+  }
 
   return (
     <SectionCard
@@ -448,6 +530,7 @@ export function VideosPage({
 export function EventsPage({
   items = [],
   query = '',
+  loading = false,
   onCreateEvent,
   onEditEvent,
   onDeleteEvent,
@@ -468,6 +551,24 @@ export function EventsPage({
   useEffect(() => {
     setCurrentPage((page) => (page > totalPages ? totalPages : page))
   }, [totalPages])
+
+  if (loading) {
+    return (
+      <SectionCard
+        eyebrow="Schedule Desk"
+        title="Events"
+        subtitle="Loading events..."
+        metrics={[
+          { label: 'Upcoming', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={102} />, tone: 'positive' },
+          { label: 'Past', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={100} />, tone: 'info' },
+          { label: 'With media', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={122} />, tone: 'warm' },
+        ]}
+        actions={<Skeleton variant="rounded" width={138} height={40} />}
+      >
+        <LoadingRows />
+      </SectionCard>
+    )
+  }
 
   return (
     <SectionCard
@@ -630,6 +731,7 @@ export function EventsPage({
 export function MemorandumPage({
   items = [],
   query = '',
+  loading = false,
   onCreateMemorandum,
   onEditMemorandum,
   onDeleteMemorandum,
@@ -653,6 +755,24 @@ export function MemorandumPage({
   useEffect(() => {
     setCurrentPage((page) => (page > totalPages ? totalPages : page))
   }, [totalPages])
+
+  if (loading) {
+    return (
+      <SectionCard
+        eyebrow="Document Center"
+        title="Memorandum"
+        subtitle="Loading memorandums..."
+        metrics={[
+          { label: 'Published', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={94} />, tone: 'positive' },
+          { label: 'Drafts', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={104} />, tone: 'warm' },
+          { label: 'Uploaded pages', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={126} />, tone: 'info' },
+        ]}
+        actions={<Skeleton variant="rounded" width={178} height={40} />}
+      >
+        <LoadingRows />
+      </SectionCard>
+    )
+  }
 
   return (
     <SectionCard
@@ -803,11 +923,30 @@ export function MemorandumPage({
 export function MagnaCartaPage({
   items = [],
   query = '',
+  loading = false,
   onCreateMagnaCarta,
   onEditMagnaCarta,
 }) {
   const filteredItems = items.filter((item) => matchesQuery(item, query))
   const publishedCount = filteredItems.filter((item) => String(item?.status || '').toLowerCase().includes('publish')).length
+
+  if (loading) {
+    return (
+      <SectionCard
+        eyebrow="Policy Reference"
+        title="Magna Carta"
+        subtitle="Loading policy references..."
+        metrics={[
+          { label: 'Published', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={96} />, tone: 'positive' },
+          { label: 'Drafts', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={106} />, tone: 'warm' },
+          { label: 'With images', value: <LoadingSummaryValue />, helper: <LoadingSummaryHelper width={108} />, tone: 'info' },
+        ]}
+        actions={<Skeleton variant="rounded" width={176} height={40} />}
+      >
+        <LoadingCards count={4} />
+      </SectionCard>
+    )
+  }
 
   return (
     <SectionCard

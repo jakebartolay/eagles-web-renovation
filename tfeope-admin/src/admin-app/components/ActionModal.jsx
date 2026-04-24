@@ -26,8 +26,38 @@ const modalCopy = {
   editOfficer: {
     eyebrow: 'Leadership Directory',
     title: 'Edit Officer',
-    subtitle: 'Update officer profile picture and position.',
+    subtitle: 'Update officer profile picture, position, and full position.',
     submitLabel: 'Update Officer',
+  },
+  editGovernor: {
+    eyebrow: 'Leadership Directory',
+    title: 'Edit Governor',
+    subtitle: 'Update governor name and profile image.',
+    submitLabel: 'Update Governor',
+  },
+  appointed: {
+    eyebrow: 'Leadership Directory',
+    title: 'Add Appointed Officer',
+    subtitle: 'Add appointed officer details with committee and region assignment.',
+    submitLabel: 'Add Officer',
+  },
+  editAppointed: {
+    eyebrow: 'Leadership Directory',
+    title: 'Edit Appointed Officer',
+    subtitle: 'Update appointed officer details, committee, and region assignment.',
+    submitLabel: 'Update Officer',
+  },
+  pastLeader: {
+    eyebrow: 'Leadership History',
+    title: 'Add Past Leader',
+    subtitle: 'Add leadership history entry with term and optional achievements.',
+    submitLabel: 'Add Past Leader',
+  },
+  editPastLeader: {
+    eyebrow: 'Leadership History',
+    title: 'Edit Past Leader',
+    subtitle: 'Update term, achievements, sorting priority, and status.',
+    submitLabel: 'Update Past Leader',
   },
   event: {
     eyebrow: 'Schedule Desk',
@@ -58,6 +88,12 @@ const modalCopy = {
     title: 'Import Members CSV',
     subtitle: 'Upload a CSV using your existing layout to create or refresh member records in bulk.',
     submitLabel: 'Import CSV',
+  },
+  regionClub: {
+    eyebrow: 'Member Directory',
+    title: 'Setup Region + Club',
+    subtitle: 'Encode governor, region, and club first so Add Member stays clean and dropdown-only. You can also rename an existing region here.',
+    submitLabel: 'Save Setup',
   },
   user: {
     eyebrow: 'Access Control',
@@ -291,7 +327,11 @@ export default function ActionModal({
   onVideoSubmit,
   onEventSubmit,
   onOfficerSubmit,
+  onGovernorSubmit,
+  onAppointedSubmit,
+  onPastLeaderSubmit,
   onMemberSubmit,
+  onRegionClubSubmit,
   onMemberImportSubmit,
   onUserSubmit,
   onMemorandumSubmit,
@@ -300,7 +340,11 @@ export default function ActionModal({
   videoForm,
   eventForm,
   officerForm,
+  governorForm,
+  appointedForm,
+  pastLeaderForm,
   memberForm,
+  regionClubForm,
   memberImportForm,
   userForm,
   memorandumForm,
@@ -309,7 +353,11 @@ export default function ActionModal({
   onVideoFieldChange,
   onEventFieldChange,
   onOfficerFieldChange,
+  onGovernorFieldChange,
+  onAppointedFieldChange,
+  onPastLeaderFieldChange,
   onMemberFieldChange,
+  onRegionClubFieldChange,
   onMemberImportFieldChange,
   onUserFieldChange,
   onMemorandumFieldChange,
@@ -317,6 +365,7 @@ export default function ActionModal({
   submitting,
   regions = [],
   regionClubMap = {},
+  governors = [],
   isSuperAdmin,
 }) {
   if (!open) return null
@@ -326,12 +375,55 @@ export default function ActionModal({
   const isEditingVideo = mode === 'editVideo'
   const isEditingUser = mode === 'editUser'
   const isEditingEvent = mode === 'editEvent'
+  const isEditingAppointed = mode === 'editAppointed'
+  const isEditingPastLeader = mode === 'editPastLeader'
   const currentRegion = String(memberForm?.region || '').trim()
   const currentClub = String(memberForm?.club || '').trim()
   const regionOptions = sortLabels(Array.from(new Set([...regions, currentRegion].filter(Boolean))))
   const clubOptions = currentRegion
     ? sortLabels(Array.from(new Set([...(regionClubMap[currentRegion] || []), currentClub].filter(Boolean))))
     : []
+  const governorRegionOptions = []
+  ;(Array.isArray(governors) ? governors : []).forEach((governor) => {
+    const governorId = Number(governor?.id ?? governor?.governor_id ?? 0) || 0
+    const governorName = String(governor?.name || governor?.governor_name || '').trim()
+    if (governorId <= 0 || governorName === '') {
+      return
+    }
+
+    const regionItems = Array.isArray(governor?.regions) ? governor.regions : []
+    if (regionItems.length === 0) {
+      governorRegionOptions.push({
+        value: `${governorId}::0::::${encodeURIComponent(governorName)}`,
+        label: `${governorName} - No region encoded`,
+      })
+      return
+    }
+
+    regionItems.forEach((regionItem) => {
+      const regionId = Number(regionItem?.id ?? regionItem?.region_id ?? 0) || 0
+      const regionName = String(regionItem?.name || regionItem?.region_name || '').trim()
+      if (regionId <= 0 && regionName === '') {
+        return
+      }
+
+      governorRegionOptions.push({
+        value: `${governorId}::${regionId}::${encodeURIComponent(regionName)}::${encodeURIComponent(governorName)}`,
+        label: `${governorName} - ${regionName || 'No region encoded'}`,
+      })
+    })
+  })
+
+  governorRegionOptions.sort((first, second) => first.label.localeCompare(second.label))
+  const selectedGovernorSelection = String(regionClubForm?.governor_selection || '').trim()
+  const hasSelectedExistingRegion = (
+    selectedGovernorSelection !== '__NEW__'
+    && (Number(regionClubForm?.region_id || 0) || 0) > 0
+  )
+  const selectedSetupAction = String(regionClubForm?.setup_action || 'add_club').trim()
+  const selectedRenameAction = hasSelectedExistingRegion && selectedSetupAction === 'rename_region'
+  const selectedRegionLocked = hasSelectedExistingRegion && !selectedRenameAction
+  const regionClubSubmitLabel = selectedRenameAction ? 'Update Region Name' : copy.submitLabel
   const now = new Date()
   const localToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const localYesterday = new Date(localToday)
@@ -615,6 +707,16 @@ export default function ActionModal({
                 />
               </Field>
 
+              <Field label="Full Position" fullWidth>
+                <input
+                  type="text"
+                  placeholder="Officer full position"
+                  value={officerForm?.full_position || ''}
+                  onChange={(event) => onOfficerFieldChange('full_position', event.target.value)}
+                  required
+                />
+              </Field>
+
               <Field label="Photo upload" fullWidth>
                 <input
                   type="file"
@@ -634,6 +736,343 @@ export default function ActionModal({
                   aria-hidden="true"
                 ></i>
                 {submitting ? 'Saving...' : copy.submitLabel}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {mode === 'editGovernor' && (
+          <form onSubmit={onGovernorSubmit} className="admin-modal-form">
+            {governorForm?.imageUrl ? (
+              <div className="admin-modal-note media">
+                <span>Current governor image</span>
+                <div className="admin-modal-media">
+                  <img src={governorForm.imageUrl} alt={governorForm?.name || 'Governor image'} />
+                  <div>
+                    <strong>{governorForm?.imageFilename || 'Existing uploaded image'}</strong>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="admin-modal-grid">
+              <Field label="Name" fullWidth>
+                <input
+                  type="text"
+                  placeholder="Governor name"
+                  value={governorForm?.name || ''}
+                  onChange={(event) => onGovernorFieldChange('name', event.target.value)}
+                  required
+                />
+              </Field>
+
+              <Field label="Photo upload" fullWidth helper="Upload to change existing image or add one if empty.">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => onGovernorFieldChange('image', event.target.files?.[0] || null)}
+                />
+              </Field>
+            </div>
+
+            <div className="admin-modal-actions">
+              <button type="button" className="admin-secondary-button" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="submit" className="admin-primary-button" disabled={submitting}>
+                <i
+                  className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-floppy-disk'}`}
+                  aria-hidden="true"
+                ></i>
+                {submitting ? 'Saving...' : copy.submitLabel}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {(mode === 'appointed' || mode === 'editAppointed') && isSuperAdmin && (
+          <form onSubmit={onAppointedSubmit} className="admin-modal-form">
+            <div className="admin-modal-grid">
+              {isEditingAppointed ? (
+                <Field label="Record ID">
+                  <input type="text" value={appointedForm?.id || ''} readOnly />
+                </Field>
+              ) : null}
+
+              <Field label="Name" fullWidth>
+                <input
+                  type="text"
+                  placeholder="Officer name"
+                  value={appointedForm?.name || ''}
+                  onChange={(event) => onAppointedFieldChange('name', event.target.value)}
+                  required
+                />
+              </Field>
+
+              <Field label="Position" fullWidth>
+                <input
+                  type="text"
+                  placeholder="Officer position"
+                  value={appointedForm?.position || ''}
+                  onChange={(event) => onAppointedFieldChange('position', event.target.value)}
+                  required
+                />
+              </Field>
+
+              <Field label="Committee" fullWidth>
+                <input
+                  type="text"
+                  placeholder="Committee name"
+                  value={appointedForm?.committee || ''}
+                  onChange={(event) => onAppointedFieldChange('committee', event.target.value)}
+                  required
+                />
+              </Field>
+
+              <Field label="Region" fullWidth>
+                <input
+                  type="text"
+                  placeholder="Region name"
+                  value={appointedForm?.region || ''}
+                  onChange={(event) => onAppointedFieldChange('region', event.target.value)}
+                  required
+                />
+              </Field>
+            </div>
+
+            <div className="admin-modal-actions">
+              <button type="button" className="admin-secondary-button" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="submit" className="admin-primary-button" disabled={submitting}>
+                <i
+                  className={`fas ${submitting ? 'fa-circle-notch fa-spin' : isEditingAppointed ? 'fa-floppy-disk' : 'fa-user-plus'}`}
+                  aria-hidden="true"
+                ></i>
+                {submitting ? 'Saving...' : copy.submitLabel}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {(mode === 'pastLeader' || mode === 'editPastLeader') && isSuperAdmin && (
+          <form onSubmit={onPastLeaderSubmit} className="admin-modal-form">
+            {pastLeaderForm?.photoUrl ? (
+              <div className="admin-modal-note media">
+                <span>Current photo</span>
+                <div className="admin-modal-media">
+                  <img src={pastLeaderForm.photoUrl} alt={pastLeaderForm?.name || 'Past leader photo'} />
+                  <div>
+                    <strong>{pastLeaderForm?.photoFilename || 'Existing uploaded image'}</strong>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="admin-modal-grid">
+              {isEditingPastLeader ? (
+                <Field label="Record ID">
+                  <input type="text" value={pastLeaderForm?.id || ''} readOnly />
+                </Field>
+              ) : null}
+
+              <Field label="Name" fullWidth>
+                <input
+                  type="text"
+                  placeholder="Leader name"
+                  value={pastLeaderForm?.name || ''}
+                  onChange={(event) => onPastLeaderFieldChange('name', event.target.value)}
+                  required
+                />
+              </Field>
+
+              <Field label="Position" fullWidth>
+                <input
+                  type="text"
+                  placeholder="Leadership position"
+                  value={pastLeaderForm?.position || ''}
+                  onChange={(event) => onPastLeaderFieldChange('position', event.target.value)}
+                  required
+                />
+              </Field>
+
+              <Field label="Term Start">
+                <input
+                  type="number"
+                  min="1900"
+                  max="2100"
+                  step="1"
+                  placeholder="e.g. 2022"
+                  value={pastLeaderForm?.term_start || ''}
+                  onChange={(event) => onPastLeaderFieldChange('term_start', event.target.value)}
+                  required
+                />
+              </Field>
+
+              <Field label="Term End">
+                <input
+                  type="number"
+                  min="1900"
+                  max="2100"
+                  step="1"
+                  placeholder="e.g. 2024"
+                  value={pastLeaderForm?.term_end || ''}
+                  onChange={(event) => onPastLeaderFieldChange('term_end', event.target.value)}
+                  required
+                />
+              </Field>
+
+              <Field label="Order Priority">
+                <input
+                  type="number"
+                  step="1"
+                  placeholder="0"
+                  value={pastLeaderForm?.order_priority ?? 0}
+                  onChange={(event) => onPastLeaderFieldChange('order_priority', event.target.value)}
+                />
+              </Field>
+
+              <Field label="Status">
+                <select
+                  value={String(pastLeaderForm?.is_active ?? '1')}
+                  onChange={(event) => onPastLeaderFieldChange('is_active', event.target.value)}
+                >
+                  <option value="1">ACTIVE</option>
+                  <option value="0">ARCHIVED</option>
+                </select>
+              </Field>
+
+              <Field label="Photo upload" fullWidth helper="Optional. Upload to add or replace current photo.">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => onPastLeaderFieldChange('photo', event.target.files?.[0] || null)}
+                />
+              </Field>
+
+              <Field label="Achievements" fullWidth>
+                <textarea
+                  placeholder="Major contributions and achievements"
+                  value={pastLeaderForm?.achievements || ''}
+                  onChange={(event) => onPastLeaderFieldChange('achievements', event.target.value)}
+                  rows={5}
+                />
+              </Field>
+            </div>
+
+            <div className="admin-modal-actions">
+              <button type="button" className="admin-secondary-button" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="submit" className="admin-primary-button" disabled={submitting}>
+                <i
+                  className={`fas ${submitting ? 'fa-circle-notch fa-spin' : isEditingPastLeader ? 'fa-floppy-disk' : 'fa-user-plus'}`}
+                  aria-hidden="true"
+                ></i>
+                {submitting ? 'Saving...' : copy.submitLabel}
+              </button>
+            </div>
+          </form>
+        )}
+
+        {mode === 'regionClub' && isSuperAdmin && (
+          <form onSubmit={onRegionClubSubmit} className="admin-modal-form">
+            <div className="admin-modal-note">
+              <span>Separate setup flow</span>
+              <small>Encode governor, region, and club here before creating member records. Governor options show as "GOVERNOR - REGION".</small>
+            </div>
+
+            <div className="admin-modal-grid">
+              <Field label="Governor">
+                <select
+                  value={regionClubForm?.governor_selection || ''}
+                  onChange={(event) => onRegionClubFieldChange('governor_selection', event.target.value)}
+                  required
+                >
+                  <option value="" disabled>Select governor and region</option>
+                  <option value="__NEW__">+ Add new governor</option>
+                  {governorRegionOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+
+              {hasSelectedExistingRegion ? (
+                <Field
+                  label="Setup action"
+                  helper="Pick whether you want to add a club or rename the selected region."
+                >
+                  <select
+                    value={selectedRenameAction ? 'rename_region' : 'add_club'}
+                    onChange={(event) => onRegionClubFieldChange('setup_action', event.target.value)}
+                  >
+                    <option value="add_club">Add club under selected region</option>
+                    <option value="rename_region">Update selected region name</option>
+                  </select>
+                </Field>
+              ) : null}
+
+              {selectedGovernorSelection === '__NEW__' ? (
+                <Field label="New governor name">
+                  <input
+                    type="text"
+                    placeholder="Enter governor name"
+                    value={regionClubForm?.governor_name || ''}
+                    onChange={(event) => onRegionClubFieldChange('governor_name', event.target.value)}
+                    required
+                  />
+                </Field>
+              ) : null}
+
+              <Field
+                label="Region name"
+                helper={selectedRenameAction
+                  ? 'Edit this to rename the selected region.'
+                  : selectedRegionLocked
+                    ? 'Auto-loaded from selected governor.'
+                    : 'Required for region/club setup. Leave blank only if you are adding governor only.'}
+              >
+                <input
+                  type="text"
+                  placeholder={selectedRenameAction ? 'Enter updated region name' : 'Enter region name'}
+                  value={regionClubForm?.region_name || ''}
+                  onChange={(event) => onRegionClubFieldChange('region_name', event.target.value)}
+                  readOnly={selectedRegionLocked}
+                  required={selectedRenameAction || (!selectedRegionLocked && selectedGovernorSelection !== '__NEW__')}
+                />
+              </Field>
+
+              <Field
+                label="Club name"
+                helper={selectedRenameAction
+                  ? 'Disabled while renaming region.'
+                  : selectedRegionLocked
+                    ? 'Add club under the selected governor and region.'
+                    : 'Optional. Leave blank if you only want to create governor/region.'}
+              >
+                <input
+                  type="text"
+                  placeholder="Enter club name"
+                  value={regionClubForm?.club_name || ''}
+                  onChange={(event) => onRegionClubFieldChange('club_name', event.target.value)}
+                  disabled={selectedRenameAction}
+                  required={selectedRegionLocked && !selectedRenameAction}
+                />
+              </Field>
+            </div>
+
+            <div className="admin-modal-actions">
+              <button type="button" className="admin-secondary-button" onClick={onClose}>
+                Cancel
+              </button>
+              <button type="submit" className="admin-primary-button" disabled={submitting}>
+                <i
+                  className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-diagram-project'}`}
+                  aria-hidden="true"
+                ></i>
+                {submitting ? 'Saving...' : regionClubSubmitLabel}
               </button>
             </div>
           </form>

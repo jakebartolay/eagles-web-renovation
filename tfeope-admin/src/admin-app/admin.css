@@ -1400,6 +1400,39 @@
   box-shadow: var(--admin-shadow-strong);
 }
 
+.admin-confirm-backdrop {
+  z-index: 58;
+}
+
+.admin-confirm-modal {
+  width: min(540px, 100%);
+  max-height: calc(100vh - 64px);
+  padding: 24px;
+}
+
+.admin-confirm-modal h2 {
+  font-size: clamp(30px, 4vw, 38px);
+}
+
+.admin-confirm-modal__warning {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(173, 60, 52, 0.2);
+  background: rgba(173, 60, 52, 0.08);
+  color: #7f2d27;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.admin-confirm-modal__warning i {
+  margin-top: 1px;
+}
+
 .admin-modal-header {
   display: flex;
   align-items: flex-start;

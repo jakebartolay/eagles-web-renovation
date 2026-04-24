@@ -218,6 +218,7 @@ if (!function_exists('admin_api_dashboard_data')) {
                 'clubs' => admin_api_count($db, 'clubs'),
                 'governors' => admin_api_count($db, 'governors'),
                 'officers' => admin_api_count($db, 'officers'),
+                'pastLeaders' => admin_api_count($db, 'past_leaders'),
                 'news' => admin_api_count($db, 'news_info'),
                 'publishedNews' => admin_api_count($db, 'news_info', 'news_status = :status', [
                     ':status' => 'Published',

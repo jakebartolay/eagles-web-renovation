@@ -41,6 +41,7 @@ try {
 
     api_execute($db, 'DELETE FROM governors WHERE governor_id = :governor_id', [':governor_id' => $governorId]);
 
+    api_delete_uploaded_file('governors', (string) ($row['governor_image'] ?? ''));
     api_delete_uploaded_file('media', (string) ($row['governor_image'] ?? ''));
     api_log_admin_action($db, $admin, 'DELETE', 'Deleted governor "' . (string) ($row['governor_name'] ?? '') . '"');
 

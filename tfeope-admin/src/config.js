@@ -1,5 +1,4 @@
 import adminBackgroundUrl from './assets/admin-bg.png'
-import adminLogoUrl from './assets/eagles.png'
 
 const PROD_API_ORIGIN = 'https://api.tfoepe-inc.com.ph'
 
@@ -35,7 +34,7 @@ function apiUrl(pathname) {
 }
 
 export const ADMIN_BRANDING = {
-  logoUrl: adminLogoUrl,
+  logoUrl: '/logo.png',
   backgroundUrl: adminBackgroundUrl,
   title: 'TFEOPE Admin',
 }
@@ -77,5 +76,19 @@ export const ADMIN_MAGNA_CARTA_UPDATE_ENDPOINT = apiUrl('/v1/admin/magna_carta/u
 export const ADMIN_OFFICERS_ENDPOINT = apiUrl('/v1/admin/officers/get_all.php')
 export const ADMIN_OFFICERS_UPDATE_ENDPOINT = apiUrl('/v1/admin/officers/update.php')
 export const ADMIN_GOVERNORS_ENDPOINT = apiUrl('/v1/admin/governors/get_all.php')
+export const ADMIN_GOVERNORS_CREATE_ENDPOINT = apiUrl('/v1/admin/governors/create.php')
+export const ADMIN_GOVERNORS_UPDATE_ENDPOINT = apiUrl('/v1/admin/governors/update.php')
+export const ADMIN_GOVERNORS_DELETE_ENDPOINT = apiUrl('/v1/admin/governors/delete.php')
+export const ADMIN_PAST_LEADERS_ENDPOINT = apiUrl('/v1/admin/past_leaders/get_all.php')
+export const ADMIN_PAST_LEADERS_CREATE_ENDPOINT = apiUrl('/v1/admin/past_leaders/create.php')
+export const ADMIN_PAST_LEADERS_UPDATE_ENDPOINT = apiUrl('/v1/admin/past_leaders/update.php')
+export const ADMIN_PAST_LEADERS_DELETE_ENDPOINT = apiUrl('/v1/admin/past_leaders/delete.php')
+export const ADMIN_APPOINTED_ENDPOINT = apiUrl('/v1/admin/appointed/get_all.php')
+export const ADMIN_APPOINTED_CREATE_ENDPOINT = apiUrl('/v1/admin/appointed/create.php')
+export const ADMIN_APPOINTED_UPDATE_ENDPOINT = apiUrl('/v1/admin/appointed/update.php')
+export const ADMIN_APPOINTED_DELETE_ENDPOINT = apiUrl('/v1/admin/appointed/delete.php')
+export const ADMIN_REGIONS_CREATE_ENDPOINT = apiUrl('/v1/admin/regions/create.php')
+export const ADMIN_REGIONS_UPDATE_ENDPOINT = apiUrl('/v1/admin/regions/update.php')
+export const ADMIN_CLUBS_CREATE_ENDPOINT = apiUrl('/v1/admin/clubs/create.php')
 export const APPOINTED_ENDPOINT = apiUrl('/v1/client/appointed/get_all.php')
 export const MAGNA_CARTA_ENDPOINT = apiUrl('/v1/client/magna_carta/get_all.php')

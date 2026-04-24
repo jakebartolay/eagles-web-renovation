@@ -33,7 +33,7 @@ try {
     $storedImage = null;
 
     if (is_array($imageUpload) && (int) ($imageUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
-        $storedImage = api_store_uploaded_file($imageUpload, 'media', api_image_extensions());
+        $storedImage = api_store_uploaded_file($imageUpload, 'governors', api_image_extensions());
     }
 
     $fields = [$map['governor']];
@@ -63,7 +63,7 @@ try {
             'data' => api_governor_by_id($db, $governorId),
         ], 201);
     } catch (Throwable $error) {
-        api_delete_uploaded_file('media', $storedImage['filename'] ?? null);
+        api_delete_uploaded_file('governors', $storedImage['filename'] ?? null);
         throw $error;
     }
 } catch (Throwable $error) {

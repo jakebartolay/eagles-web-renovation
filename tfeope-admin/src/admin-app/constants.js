@@ -15,6 +15,7 @@ export const emptyCollections = {
   officers: [],
   governors: [],
   appointed: [],
+  pastLeaders: [],
   magnaCarta: [],
 }
 
@@ -73,8 +74,8 @@ export const pageMeta = {
     title: 'Officers',
     group: 'leadership',
     eyebrow: 'Leadership Directory',
-    description: 'Browse officer assignments, clubs, and regional placement.',
-    searchPlaceholder: 'Search officers by name, position, club, or region',
+    description: 'Browse officer assignments, positions, and full-position titles.',
+    searchPlaceholder: 'Search officers by name, position, or full position',
   },
   governors: {
     title: 'Governors',
@@ -89,6 +90,13 @@ export const pageMeta = {
     eyebrow: 'Leadership Directory',
     description: 'Review appointed leadership records across clubs and regions.',
     searchPlaceholder: 'Search appointed officers by name, position, club, or region',
+  },
+  pastLeaders: {
+    title: 'Past Leaders',
+    group: 'leadership',
+    eyebrow: 'Leadership History',
+    description: 'Manage former leaders, terms served, and historical achievements.',
+    searchPlaceholder: 'Search past leaders by name, position, term, or achievements',
   },
   magnaCarta: {
     title: 'Magna Carta',
@@ -185,6 +193,11 @@ export const navSections = [
         label: 'Appointed',
         icon: 'fa-user-check',
       },
+      {
+        page: 'pastLeaders',
+        label: 'Past Leaders',
+        icon: 'fa-landmark',
+      },
     ],
   },
   {
@@ -216,6 +229,6 @@ export function initialSidebarGroups(activePage = 'dashboard') {
   return {
     members: ['members', 'users'].includes(activePage),
     content: ['news', 'videos', 'events', 'memorandum', 'magnaCarta'].includes(activePage),
-    leadership: ['officers', 'governors', 'appointed'].includes(activePage),
+    leadership: ['officers', 'governors', 'appointed', 'pastLeaders'].includes(activePage),
   }
 }

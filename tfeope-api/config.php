@@ -17,6 +17,8 @@ if (!function_exists('api_config')) {
         $storageRoot = rtrim((string) (getenv('TFEOPE_STORAGE_ROOT') ?: ($projectRoot . '/storage')), '/\\');
         $uploadsRoot = rtrim((string) (getenv('TFEOPE_UPLOADS_ROOT') ?: ($storageRoot . '/uploads')), '/\\');
 
+        $configuredBaseUrl = trim((string) (getenv('TFEOPE_BASE_URL') ?: ''));
+
         $config = [
             'workspace_storage_root' => $storageRoot,
             'db' => [
@@ -27,7 +29,8 @@ if (!function_exists('api_config')) {
                 'port' => 3306,
                 'charset' => 'utf8mb4',
             ],
-            'base_url' => 'https://api.tfoepe-inc.com.ph',
+            // Optional explicit base URL. When empty, bootstrap resolves from current request host.
+            'base_url' => $configuredBaseUrl,
             'uploads_root' => $uploadsRoot,
             'legacy_storage_root' => $storageRoot,
             'allowed_origins' => [

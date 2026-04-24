@@ -1,3 +1,5 @@
+import Skeleton from '@mui/material/Skeleton'
+
 function formatNumber(value) {
   const number = Number(value || 0)
   return Number.isFinite(number) ? number.toLocaleString() : '0'
@@ -114,11 +116,146 @@ function SnapshotRow({ label, icon, value }) {
   )
 }
 
+function DashboardLoadingState({ isSuperAdmin }) {
+  return (
+    <section className="dashboard-page">
+      <section className="dashboard-hero">
+        <div className="dashboard-hero__topline">
+          <span className="dashboard-hero__badge">
+            <Skeleton variant="text" width={130} height={18} />
+          </span>
+
+          <div className="dashboard-hero__profile">
+            <span className="dashboard-hero__avatar">
+              <Skeleton variant="circular" width={28} height={28} />
+            </span>
+            <div>
+              <Skeleton variant="text" width={120} height={20} />
+              <Skeleton variant="text" width={170} height={16} />
+            </div>
+          </div>
+        </div>
+
+        <div className="dashboard-hero__copy">
+          <p className="page-kicker"><Skeleton variant="text" width={92} height={16} /></p>
+          <h2><Skeleton variant="text" width="72%" height={36} /></h2>
+          <p>
+            <Skeleton variant="text" width="96%" height={18} />
+            <Skeleton variant="text" width="90%" height={18} />
+          </p>
+        </div>
+
+        <div className="dashboard-hero__actions">
+          <Skeleton variant="rounded" width={132} height={42} />
+          <Skeleton variant="rounded" width={170} height={42} />
+          {isSuperAdmin ? <Skeleton variant="rounded" width={132} height={42} /> : null}
+        </div>
+
+        <div className="dashboard-hero__metrics">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <article className="dashboard-hero-stat" key={`hero-loading-${index}`}>
+              <Skeleton variant="text" width={92} height={16} />
+              <Skeleton variant="text" width={82} height={32} />
+              <Skeleton variant="text" width={132} height={16} />
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <div className="dashboard-stats-grid">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <article className="dashboard-stat-card info" key={`stat-loading-${index}`} style={{ pointerEvents: 'none' }}>
+            <span className="dashboard-stat-card__icon">
+              <Skeleton variant="circular" width={36} height={36} />
+            </span>
+            <span className="dashboard-stat-card__label"><Skeleton variant="text" width={88} height={16} /></span>
+            <strong className="dashboard-stat-card__value"><Skeleton variant="text" width={72} height={32} /></strong>
+            <small className="dashboard-stat-card__subtext"><Skeleton variant="text" width={128} height={16} /></small>
+            <span className="dashboard-stat-card__hint"><Skeleton variant="text" width={96} height={14} /></span>
+          </article>
+        ))}
+      </div>
+
+      <div className="dashboard-panels">
+        <section className="dashboard-panel">
+          <div className="dashboard-panel__header">
+            <div>
+              <p className="page-kicker"><Skeleton variant="text" width={88} height={16} /></p>
+              <h3><Skeleton variant="text" width={170} height={28} /></h3>
+            </div>
+            <Skeleton variant="rounded" width={124} height={36} />
+          </div>
+
+          <div className="dashboard-activity-list">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <article className="dashboard-activity-item info" key={`activity-loading-${index}`}>
+                <span className="dashboard-activity-item__icon">
+                  <Skeleton variant="circular" width={30} height={30} />
+                </span>
+                <div className="dashboard-activity-item__main">
+                  <div className="dashboard-activity-item__top">
+                    <strong><Skeleton variant="text" width={110} height={20} /></strong>
+                    <span><Skeleton variant="text" width={120} height={16} /></span>
+                  </div>
+                  <p className="dashboard-activity-item__description">
+                    <Skeleton variant="text" width="92%" height={16} />
+                  </p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <div className="dashboard-panel-stack">
+          <section className="dashboard-panel">
+            <div className="dashboard-panel__header compact">
+              <div>
+                <p className="page-kicker"><Skeleton variant="text" width={80} height={16} /></p>
+                <h3><Skeleton variant="text" width={90} height={26} /></h3>
+              </div>
+            </div>
+
+            <div className="dashboard-snapshot-list">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div className="dashboard-snapshot-row" key={`snapshot-loading-${index}`}>
+                  <span className="dashboard-snapshot-row__label">
+                    <Skeleton variant="text" width={124} height={16} />
+                  </span>
+                  <strong><Skeleton variant="text" width={56} height={22} /></strong>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="dashboard-panel">
+            <div className="dashboard-panel__header compact">
+              <div>
+                <p className="page-kicker"><Skeleton variant="text" width={82} height={16} /></p>
+                <h3><Skeleton variant="text" width={136} height={26} /></h3>
+              </div>
+            </div>
+
+            <div className="dashboard-shortcut-list">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div className="dashboard-shortcut-card" key={`shortcut-loading-${index}`} style={{ pointerEvents: 'none' }}>
+                  <strong><Skeleton variant="text" width={170} height={20} /></strong>
+                  <span><Skeleton variant="text" width="96%" height={16} /></span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 export default function DashboardPage({
   dashboard = {},
   collections = {},
   query = '',
   user,
+  loading = false,
   onNavigate,
   onOpenQuickAction,
   isSuperAdmin,
@@ -155,6 +292,10 @@ export default function DashboardPage({
       helper: isSuperAdmin ? 'Full content and member controls' : 'Operational access enabled',
     },
   ]
+
+  if (loading) {
+    return <DashboardLoadingState isSuperAdmin={isSuperAdmin} />
+  }
 
   return (
     <section className="dashboard-page">
@@ -273,6 +414,14 @@ export default function DashboardPage({
           onClick={() => onNavigate?.('governors')}
         />
         <QuickStatCard
+          label="Past Leaders"
+          value={stats.pastLeaders}
+          subtext="Leadership history records"
+          icon="fa-landmark"
+          tone="warm"
+          onClick={() => onNavigate?.('pastLeaders')}
+        />
+        <QuickStatCard
           label="Admins"
           value={stats.admins}
           subtext={isSuperAdmin ? 'Super admin access enabled' : 'Operational admin access'}
@@ -332,6 +481,7 @@ export default function DashboardPage({
               <SnapshotRow label="Officers" icon="fa-user-tie" value={collections?.officers?.length} />
               <SnapshotRow label="Governors" icon="fa-scale-balanced" value={collections?.governors?.length} />
               <SnapshotRow label="Appointed" icon="fa-user-check" value={collections?.appointed?.length} />
+              <SnapshotRow label="Past Leaders" icon="fa-landmark" value={collections?.pastLeaders?.length} />
               <SnapshotRow label="Magna Carta" icon="fa-book" value={collections?.magnaCarta?.length} />
             </div>
           </section>

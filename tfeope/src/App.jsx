@@ -1,51 +1,99 @@
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
-import { useEffect } from 'react'
-import Home from './pages/home.jsx'
-import AboutUs from './pages/aboutUs.jsx'
-import News from './pages/news.jsx'
-import Officers from './pages/officers.jsx'
-import Events from './pages/events.jsx'
-import Governors from './pages/governor.jsx'
-import AppointedOfficers from './pages/appointed_ofc.jsx'
-import BoardOfTrustees from './pages/board_of_trustees.jsx'
-import NationalCommissions from './pages/national_comm.jsx'
-import NationalExecutives from './pages/national_exec.jsx'
-import Membership from './pages/membership.jsx'
-import MagnaCarta from './pages/magna-carta.jsx'
-import Secretariat from './pages/secretariat.jsx'
-import PeilDirectors from './pages/peil_directors.jsx'
+import Backdrop from '@mui/material/Backdrop';
+import Box from '@mui/material/Box';
+import CircularProgress from '@mui/material/CircularProgress';
+import { useEffect, useMemo, useState } from 'react';
+import Footer from './components/Footer';
+import { usePathRoute } from './components/HashRouter';
+import Navigation from './components/Navigation';
+import { getPendingApiRequestCount, subscribeToApiRequestActivity } from './config/api';
+import {
+  ClubsPage,
+  EventsPage,
+  HistoryPage,
+  HomePage,
+  MagnaCartaPage,
+  MemberSearchPage,
+  NewsPage,
+  OfficersPage,
+  VideosPage,
+} from './pages';
+import './styles.css';
 
-function ScrollToTop() {
-  const location = useLocation()
+const ROUTES = {
+  '/': HomePage,
+  '/history': HistoryPage,
+  '/magna-carta': MagnaCartaPage,
+  '/members/member_search': MemberSearchPage,
+  '/news': NewsPage,
+  '/events': EventsPage,
+  '/officers': () => <OfficersPage groupKey="national" />,
+  '/officers/national': () => <OfficersPage groupKey="national" />,
+  '/officers/governors': () => <OfficersPage groupKey="governors" />,
+  '/officers/appointed': () => <OfficersPage groupKey="appointed" />,
+  '/officers/past-leaders': () => <OfficersPage groupKey="pastLeaders" />,
+  '/clubs': ClubsPage,
+  '/videos': VideosPage,
+};
+
+export default function EaglesLanding() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [apiBusy, setApiBusy] = useState(() => getPendingApiRequestCount() > 0);
+  const { currentPath, navigate } = usePathRoute();
+  const isStandaloneMemberPage = currentPath === '/members/member_search';
+  const routeClass = useMemo(() => {
+    if (currentPath === '/') return 'home';
+    const [topLevelRoute] = currentPath.split('/').filter(Boolean);
+    return topLevelRoute || 'home';
+  }, [currentPath]);
+
+  const ActivePage = useMemo(() => ROUTES[currentPath] || HomePage, [currentPath]);
 
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'auto' })
-  }, [location.pathname])
+    const unsubscribe = subscribeToApiRequestActivity((pendingCount) => {
+      setApiBusy(pendingCount > 0);
+    });
 
-  return null
-}
+    return unsubscribe;
+  }, []);
 
-export default function App() {
   return (
-    <BrowserRouter>
-      <ScrollToTop />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/about-us" element={<AboutUs />} />
-        <Route path="/news" element={<News />} />
-        <Route path="/officers" element={<Officers />} />
-        <Route path="/events" element={<Events />} />
-        <Route path="/governors" element={<Governors />} />
-        <Route path="/appointed-ofc" element={<AppointedOfficers />} />
-        <Route path="/board-of-trustees" element={<BoardOfTrustees />} />
-        <Route path="/national-commissions" element={<NationalCommissions />} />
-        <Route path="/national-executives" element={<NationalExecutives />} />
-        <Route path="/membership" element={<Membership />} />
-        <Route path="/magna-carta" element={<MagnaCarta />} />
-        <Route path="/secretariat" element={<Secretariat />} />
-        <Route path="/peil-directors" element={<PeilDirectors />} />
-        <Route path="*" element={<Home />} />
-      </Routes>
-    </BrowserRouter>
-  )
+    <div className="app">
+      {!isStandaloneMemberPage && (
+        <Navigation currentPath={currentPath} onNavigate={navigate} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+      )}
+
+      <main className={`main-content route-${routeClass}`}>
+        <ActivePage />
+      </main>
+
+      {!isStandaloneMemberPage && <Footer />}
+
+      <Backdrop
+        open={apiBusy}
+        sx={{
+          color: '#fff',
+          zIndex: (theme) => theme.zIndex.drawer + 2000,
+          backgroundColor: 'rgba(4, 12, 30, 0.45)',
+          backdropFilter: 'blur(2px)',
+        }}
+      >
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 1.2,
+            px: 3,
+            py: 2.5,
+            borderRadius: 2,
+            border: '1px solid rgba(255, 255, 255, 0.25)',
+            backgroundColor: 'rgba(0, 0, 0, 0.38)',
+          }}
+        >
+          <CircularProgress color="inherit" size={34} thickness={4.2} />
+          <strong style={{ fontSize: '0.95rem', letterSpacing: '0.02em' }}>Loading data...</strong>
+        </Box>
+      </Backdrop>
+    </div>
+  );
 }

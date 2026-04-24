@@ -1,4 +1,5 @@
 import { useDeferredValue, useEffect, useState } from 'react'
+import Skeleton from '@mui/material/Skeleton'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 
@@ -159,9 +160,33 @@ function TableSearch({ value, onChange, placeholder }) {
   )
 }
 
+function LoadingButtonsRow({ isSuperAdmin }) {
+  if (!isSuperAdmin) {
+    return null
+  }
+
+  return (
+    <>
+      <Skeleton variant="rounded" width={120} height={40} />
+      <Skeleton variant="rounded" width={148} height={40} />
+    </>
+  )
+}
+
+function LoadingRows({ count = 8 }) {
+  return (
+    <div style={{ display: 'grid', gap: '0.65rem' }}>
+      {Array.from({ length: count }).map((_, index) => (
+        <Skeleton key={`row-skeleton-${index}`} variant="rounded" height={52} />
+      ))}
+    </div>
+  )
+}
+
 export function MembersPage({
   members = [],
   query = '',
+  loading = false,
   isSuperAdmin = false,
   onCreateMember,
   onImportMembers,
@@ -234,6 +259,55 @@ export function MembersPage({
       setCurrentPage(totalPages)
     }
   }, [currentPage, totalPages])
+
+  if (loading) {
+    return (
+      <SectionCard
+        eyebrow="Member Directory"
+        title="Members"
+        subtitle="Loading member records..."
+        metrics={[
+          {
+            label: 'Active',
+            value: <Skeleton variant="text" width={44} height={30} />,
+            helper: <Skeleton variant="text" width={126} height={16} />,
+            tone: 'positive',
+          },
+          {
+            label: 'Clubs',
+            value: <Skeleton variant="text" width={44} height={30} />,
+            helper: <Skeleton variant="text" width={118} height={16} />,
+            tone: 'info',
+          },
+          {
+            label: 'Regions',
+            value: <Skeleton variant="text" width={44} height={30} />,
+            helper: <Skeleton variant="text" width={118} height={16} />,
+            tone: 'warm',
+          },
+        ]}
+        actions={<LoadingButtonsRow isSuperAdmin={isSuperAdmin} />}
+      >
+        <div className="members-toolbar">
+          <Skeleton variant="rounded" width={300} height={42} />
+
+          <div className="members-toolbar__line">
+            <div className="members-toolbar__filters" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <Skeleton variant="rounded" width={140} height={44} />
+              <Skeleton variant="rounded" width={140} height={44} />
+              <Skeleton variant="rounded" width={140} height={44} />
+            </div>
+            <p className="table-pagination__info members-toolbar__info">
+              <Skeleton variant="text" width={166} height={18} />
+            </p>
+          </div>
+        </div>
+
+        <LoadingRows />
+      </SectionCard>
+    )
+  }
+
 
   function clearTableFilters() {
     setTableSearch('')
@@ -454,6 +528,7 @@ export function UsersPage({
   users = [],
   query = '',
   user,
+  loading = false,
   isSuperAdmin = false,
   onCreateUser,
   onEditUser,
@@ -465,6 +540,39 @@ export function UsersPage({
     || resolveUserRoleLabel(item).toLowerCase().includes('super')
   )).length
   const admins = filteredItems.filter((item) => resolveUserRoleId(item) === 2).length
+
+  if (loading) {
+    return (
+      <SectionCard
+        eyebrow="Access Control"
+        title="Users"
+        subtitle="Loading admin accounts..."
+        metrics={[
+          {
+            label: 'Super admins',
+            value: <Skeleton variant="text" width={44} height={30} />,
+            helper: <Skeleton variant="text" width={128} height={16} />,
+            tone: 'danger',
+          },
+          {
+            label: 'Admins',
+            value: <Skeleton variant="text" width={44} height={30} />,
+            helper: <Skeleton variant="text" width={122} height={16} />,
+            tone: 'info',
+          },
+          {
+            label: 'Usernames',
+            value: <Skeleton variant="text" width={44} height={30} />,
+            helper: <Skeleton variant="text" width={116} height={16} />,
+            tone: 'warm',
+          },
+        ]}
+        actions={isSuperAdmin ? <Skeleton variant="rounded" width={138} height={40} /> : null}
+      >
+        <LoadingRows />
+      </SectionCard>
+    )
+  }
 
   return (
     <SectionCard
