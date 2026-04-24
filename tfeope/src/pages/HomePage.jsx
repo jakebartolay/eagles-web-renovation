@@ -362,10 +362,6 @@ export default function HomePage() {
             <video className="home-video-modal-player" controls autoPlay playsInline>
               <source src={activeHymnalVideo.videoUrl} type="video/mp4" />
             </video>
-            <div className="home-video-modal-caption">
-              <h3>{activeHymnalVideo.title}</h3>
-              <p>{activeHymnalVideo.description}</p>
-            </div>
           </div>
         </div>
       )}
