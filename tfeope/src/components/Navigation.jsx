@@ -2,7 +2,7 @@ import { ChevronDown, Menu, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 const navItems = [
-  { path: '/clubs', label: 'Regional Clubs' },
+  { path: '/clubs', label: 'Clubs' },
 ];
 const OFFICERS_DROPDOWN_ITEMS = [
   { path: '/officers/national', label: 'National Officers (current)' },
