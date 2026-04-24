@@ -1,6 +1,3 @@
-import Backdrop from '@mui/material/Backdrop';
-import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
 import { useEffect, useMemo, useState } from 'react';
 import Footer from './components/Footer';
 import { usePathRoute } from './components/HashRouter';
@@ -35,9 +32,26 @@ const ROUTES = {
   '/videos': VideosPage,
 };
 
+const PAGE_TITLES = {
+  '/': 'The Fraternal Order of Eagles',
+  '/history': 'History',
+  '/magna-carta': 'Magna Carta',
+  '/members/member_search': 'Member Search',
+  '/news': 'News',
+  '/events': 'Events',
+  '/officers': 'National Officers',
+  '/officers/national': 'National Officers',
+  '/officers/governors': 'Governors',
+  '/officers/appointed': 'Appointed Officers',
+  '/officers/past-leaders': 'Past Leaders',
+  '/clubs': 'Regional Clubs',
+  '/videos': 'Videos',
+};
+
 export default function EaglesLanding() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [apiBusy, setApiBusy] = useState(() => getPendingApiRequestCount() > 0);
+  const [showLoader, setShowLoader] = useState(true);
   const { currentPath, navigate } = usePathRoute();
   const isStandaloneMemberPage = currentPath === '/members/member_search';
   const routeClass = useMemo(() => {
@@ -49,12 +63,52 @@ export default function EaglesLanding() {
   const ActivePage = useMemo(() => ROUTES[currentPath] || HomePage, [currentPath]);
 
   useEffect(() => {
+    const pageTitle = PAGE_TITLES[currentPath] || PAGE_TITLES['/'];
+    document.title = `Ang Agila | ${pageTitle}`;
+  }, [currentPath]);
+
+  useEffect(() => {
     const unsubscribe = subscribeToApiRequestActivity((pendingCount) => {
       setApiBusy(pendingCount > 0);
     });
 
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (currentPath !== '/') {
+      setShowLoader(false);
+      return undefined;
+    }
+
+    if (apiBusy) {
+      setShowLoader(true);
+      return undefined;
+    }
+
+    setShowLoader(true);
+    const loaderTimer = window.setTimeout(() => {
+      setShowLoader(false);
+    }, 5000);
+
+    return () => window.clearTimeout(loaderTimer);
+  }, [apiBusy, currentPath]);
+
+  useEffect(() => {
+    if (!showLoader) {
+      document.documentElement.classList.remove('app-loader-active');
+      document.body.classList.remove('app-loader-active');
+      return undefined;
+    }
+
+    document.documentElement.classList.add('app-loader-active');
+    document.body.classList.add('app-loader-active');
+
+    return () => {
+      document.documentElement.classList.remove('app-loader-active');
+      document.body.classList.remove('app-loader-active');
+    };
+  }, [showLoader]);
 
   return (
     <div className="app">
@@ -68,32 +122,17 @@ export default function EaglesLanding() {
 
       {!isStandaloneMemberPage && <Footer />}
 
-      <Backdrop
-        open={apiBusy}
-        sx={{
-          color: '#fff',
-          zIndex: (theme) => theme.zIndex.drawer + 2000,
-          backgroundColor: 'rgba(4, 12, 30, 0.45)',
-          backdropFilter: 'blur(2px)',
-        }}
-      >
-        <Box
-          sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: 1.2,
-            px: 3,
-            py: 2.5,
-            borderRadius: 2,
-            border: '1px solid rgba(255, 255, 255, 0.25)',
-            backgroundColor: 'rgba(0, 0, 0, 0.38)',
-          }}
-        >
-          <CircularProgress color="inherit" size={34} thickness={4.2} />
-          <strong style={{ fontSize: '0.95rem', letterSpacing: '0.02em' }}>Loading data...</strong>
-        </Box>
-      </Backdrop>
+      {showLoader && (
+        <div className="app-loader" role="status" aria-live="polite" aria-label="Loading page">
+          <div className="app-loader-content">
+            <div className="app-loader-logo-wrap">
+              <img className="app-loader-logo" src="/logo.png" alt="The Fraternal Order of Eagles logo" />
+            </div>
+            <div className="app-loader-title">Fraternal Order of Eagles</div>
+            <div className="app-loader-subtitle">Service Through Strong Brotherhood</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
