@@ -1,4 +1,4 @@
-const PROD_API_BASE = 'https://api.tfoepe-inc.com.ph/tfeope-api';
+const PROD_API_BASE = 'https://api.tfoepe-inc.com.ph/api';
 const LOCAL_API_BASE = 'http://127.0.0.1/tfeope-api';
 
 export const API_BASE = (
