@@ -502,6 +502,223 @@ p {
   font-family: 'Montserrat', sans-serif;
 }
 
+.home-hymnals-section {
+  max-width: 1400px;
+  margin: 0 auto 3rem;
+  padding: 0 2rem;
+}
+
+.home-hymnals-panel {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(2rem, 5vw, 3.5rem) 1.5rem;
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0)),
+    rgb(22, 36, 71);
+  color: #fff;
+  text-align: center;
+  box-shadow: 0 18px 42px rgba(22, 36, 71, 0.22);
+}
+
+.home-hymnals-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.15), transparent 42%);
+  pointer-events: none;
+}
+
+.home-hymnals-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.home-hymnals-header {
+  max-width: 780px;
+  margin: 0 auto 1.65rem;
+}
+
+.home-hymnals-icons {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.home-hymnals-title {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 900;
+  line-height: 1.12;
+  margin-bottom: 0.65rem;
+}
+
+.home-hymnals-subtitle {
+  max-width: 720px;
+  margin: 0 auto;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: clamp(1rem, 2vw, 1.18rem);
+  font-weight: 500;
+}
+
+.home-hymnals-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 1.8rem;
+}
+
+.home-hymnal-card {
+  overflow: hidden;
+  border-radius: 12px;
+  background: #0f172a;
+  color: var(--text-primary);
+  text-align: left;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+}
+
+.home-hymnal-video {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: #0f172a;
+  cursor: pointer;
+}
+
+.home-hymnal-video video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.home-hymnal-video::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.38)),
+    rgba(0, 0, 0, 0.18);
+  transition: background 0.22s ease;
+}
+
+.home-hymnal-video:hover::after {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0.32)),
+    rgba(0, 0, 0, 0.12);
+}
+
+.home-hymnal-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 1;
+  width: 58px;
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+  transform: translate(-50%, -50%);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+  transition: transform 0.22s ease, background 0.22s ease;
+}
+
+.home-hymnal-video:hover .home-hymnal-play {
+  background: rgba(0, 0, 0, 0.9);
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.home-hymnal-overlay {
+  position: absolute;
+  left: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  color: #fff;
+  text-align: left;
+  text-shadow: none;
+}
+
+.home-hymnal-overlay strong {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.home-hymnal-overlay span {
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.9rem;
+  line-height: 1.35;
+}
+
+.home-video-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.home-video-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  cursor: pointer;
+}
+
+.home-video-modal-dialog {
+  position: relative;
+  z-index: 1;
+  width: min(980px, 96vw);
+  max-height: calc(100vh - 3rem);
+  overflow: auto;
+  border-radius: 14px;
+  background: #000;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.7);
+}
+
+.home-video-modal-close {
+  position: absolute;
+  right: 0.8rem;
+  top: 0.8rem;
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: rgb(22, 36, 71);
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+}
+
+.home-video-modal-player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: block;
+  background: #000;
+}
+
 /* Home Memorandum */
 .memorandum-section {
   margin: 2rem auto 0;

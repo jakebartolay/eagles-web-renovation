@@ -268,6 +268,37 @@ export default function HomePage() {
           </div>
         ) : null}
       </section>
+<<<<<<< HEAD
+=======
+
+      {activeHymnalVideo && (
+        <div className="home-video-modal" role="dialog" aria-modal="true" aria-label={activeHymnalVideo.title}>
+          <button
+            type="button"
+            className="home-video-modal-backdrop"
+            onClick={() => setActiveHymnalVideo(null)}
+            aria-label="Close video"
+          />
+          <div className="home-video-modal-dialog">
+            <button
+              type="button"
+              className="home-video-modal-close"
+              onClick={() => setActiveHymnalVideo(null)}
+              aria-label="Close video"
+            >
+              <X size={24} />
+            </button>
+            <video className="home-video-modal-player" controls autoPlay playsInline>
+              <source src={activeHymnalVideo.videoUrl} type="video/mp4" />
+            </video>
+            <div className="home-video-modal-caption">
+              <h3>{activeHymnalVideo.title}</h3>
+              <p>{activeHymnalVideo.description}</p>
+            </div>
+          </div>
+        </div>
+      )}
+>>>>>>> parent of c3a5363 (yes ser!!!)
     </div>
   );
 }
