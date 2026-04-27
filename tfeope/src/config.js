@@ -20,7 +20,8 @@ function normalizeOrigin(origin) {
 const defaultOrigin = import.meta.env.VITE_API_ORIGIN
   || (import.meta.env.DEV ? 'http://localhost' : PROD_API_ORIGIN)
 const API_ORIGIN = normalizeOrigin(defaultOrigin)
-const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH || '/tfeope-api').replace(/\/$/, '')
+const defaultBasePath = import.meta.env.DEV ? '/tfeope-api' : ''
+const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH ?? defaultBasePath).replace(/\/$/, '')
 
 function apiUrl(path) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
