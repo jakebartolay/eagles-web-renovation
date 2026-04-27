@@ -1,17 +1,10 @@
-const PROD_API_BASE = 'https://api.tfoepe-inc.com.ph/api';
+const PROD_API_BASE = 'https://api.tfoepe-inc.com.ph';
 const LOCAL_API_BASE = 'http://127.0.0.1/tfeope-api';
 
 export const API_BASE = (
   import.meta.env.VITE_API_BASE ||
   (import.meta.env.DEV ? LOCAL_API_BASE : PROD_API_BASE)
 ).replace(/\/$/, '');
-
-// Runtime API base — may be swapped at runtime if the deployed server exposes a
-// different mount point (e.g. `/api` vs `/tfeope-api`). Exported for testing.
-export let RUNTIME_API_BASE = API_BASE;
-export const setRuntimeApiBase = (base) => {
-  RUNTIME_API_BASE = (base || '').toString().replace(/\/$/, '');
-};
 
 export const API_ENDPOINTS = {
   home: '/api/public/home.php',
@@ -41,7 +34,7 @@ export const API_ENDPOINTS = {
   },
 };
 
-export const buildApiUrl = (path) => `${RUNTIME_API_BASE}${path}`;
+export const buildApiUrl = (path) => `${API_BASE}${path}`;
 const ABSOLUTE_URL_PATTERN = /^(https?:)?\/\//i;
 const API_DISABLED_FROM_ENV = import.meta.env.VITE_DISABLE_API === 'true';
 const API_DISABLE_QUERY_KEY = 'noapi';
@@ -146,56 +139,27 @@ export const fetchJson = async (endpoint) => {
 
   incrementInFlightRequestCount();
 
-  const fetchWithBase = async (base) => {
-    const url = `${base}${endpoint}`;
-    const response = await fetch(url, { headers: { Accept: 'application/json' } });
-    if (!response.ok) {
-      throw new Error(`Request failed: ${response.status}`);
-    }
-    return response.json();
-  };
+  const requestPromise = fetch(buildApiUrl(endpoint), {
+    headers: { Accept: 'application/json' },
+  });
 
-  const attemptPromise = (async () => {
-    try {
-      return await fetchWithBase(RUNTIME_API_BASE);
-    } catch (primaryError) {
-      // Try sensible fallback bases (swap between /api and /tfeope-api).
-      const candidates = [];
-      if (RUNTIME_API_BASE.endsWith('/api')) {
-        candidates.push(RUNTIME_API_BASE.replace(/\/api$/, '/tfeope-api'));
-      } else if (RUNTIME_API_BASE.endsWith('/tfeope-api')) {
-        candidates.push(RUNTIME_API_BASE.replace(/\/tfeope-api$/, '/api'));
-      } else {
-        // Generic fallbacks if the base is unexpected
-        candidates.push((RUNTIME_API_BASE + '/tfeope-api').replace(/\/\/+/, '/'));
-        candidates.push((RUNTIME_API_BASE + '/api').replace(/\/\/+/, '/'));
+  const parsedPromise = requestPromise
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status}`);
       }
-
-      for (const candidate of candidates) {
-        if (!candidate || candidate === RUNTIME_API_BASE) continue;
-        try {
-          const data = await fetchWithBase(candidate);
-          // Persist the working base for subsequent requests.
-          RUNTIME_API_BASE = candidate.replace(/\/$/, '');
-          return data;
-        } catch (e) {
-          // try next candidate
-        }
-      }
-
-      // Nothing worked — rethrow original error for callers to handle.
-      throw primaryError;
-    } finally {
+      return response.json();
+    })
+    .catch((error) => {
+      RESPONSE_CACHE.delete(endpoint);
+      throw error;
+    })
+    .finally(() => {
       decrementInFlightRequestCount();
-    }
-  })();
+    });
 
-  // Cache the promise so parallel callers share the same request.
-  RESPONSE_CACHE.set(endpoint, attemptPromise);
-  // Ensure failures remove the cache so subsequent calls can retry.
-  attemptPromise.catch(() => RESPONSE_CACHE.delete(endpoint));
-
-  return attemptPromise;
+  RESPONSE_CACHE.set(endpoint, parsedPromise);
+  return parsedPromise;
 };
 
 export const resolveMediaUrl = (rawPath) => {
@@ -207,7 +171,7 @@ export const resolveMediaUrl = (rawPath) => {
   if (ABSOLUTE_URL_PATTERN.test(path)) return path;
 
   const normalized = path.replace(/^\.?\//, '');
-  return `${RUNTIME_API_BASE}/${normalized}`;
+  return `${API_BASE}/${normalized}`;
 };
 
 export const resolveImageFromItem = (item, keys = []) => {

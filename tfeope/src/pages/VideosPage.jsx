@@ -1,4 +1,4 @@
-import { Camera, X } from 'lucide-react';
+import { Camera, Play, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import Skeleton from '@mui/material/Skeleton';
 import Reveal from '../components/Reveal';
@@ -225,15 +225,11 @@ export default function VideosPage() {
                       disabled={!hasPlayableSource}
                       title={hasPlayableSource ? 'Play video' : 'No playable video URL from API'}
                     >
-                      {hasPlayableSource ? 'PLAY' : 'N/A'}
+                      {hasPlayableSource ? <Play size={26} fill="currentColor" /> : 'N/A'}
                     </button>
-                  </div>
-                  <div className="video-info">
-                    <h3 className="video-title">{video.title || 'Untitled Video'}</h3>
-                    <p className="video-description">{video.description || ''}</p>
-                    <div className="video-meta">
-                      <span className="video-date">{video.date || 'Recent'}</span>
-                      <span className="video-duration">{video.duration || '0:00'}</span>
+                    <div className="video-card-overlay">
+                      <h3 className="video-title">{video.title || 'Untitled Video'}</h3>
+                      <p className="video-description">{video.description || ''}</p>
                     </div>
                   </div>
                 </div>

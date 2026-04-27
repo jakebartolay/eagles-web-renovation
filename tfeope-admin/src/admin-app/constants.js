@@ -20,6 +20,12 @@ export const emptyCollections = {
 }
 
 export const pageMeta = {
+  notFound: {
+    title: 'Page Not Found',
+    eyebrow: '404 Error',
+    description: 'The requested admin page is not available.',
+    searchPlaceholder: 'Search admin workspace',
+  },
   dashboard: {
     title: 'Dashboard',
     eyebrow: 'Control Center',
@@ -215,7 +221,8 @@ export function normalizePage(page, isSuperAdmin = false) {
 
   const fallback = 'dashboard'
   if (!normalized) return fallback
-  if (!pageMeta[normalized]) return fallback
+  if (!pageMeta[normalized]) return 'notFound'
+  if (normalized === 'notFound') return 'notFound'
   if (pageMeta[normalized]?.superAdminOnly && !isSuperAdmin) return fallback
 
   return normalized

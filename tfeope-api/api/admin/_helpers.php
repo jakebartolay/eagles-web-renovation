@@ -179,6 +179,113 @@ if (!function_exists('admin_api_recent_activity')) {
     }
 }
 
+if (!function_exists('admin_api_mask_log_line')) {
+    function admin_api_mask_log_line(string $line): string
+    {
+        $line = trim($line);
+        $projectRoot = str_replace('\\', '/', dirname(__DIR__, 2));
+
+        if ($projectRoot !== '') {
+            $line = str_replace($projectRoot, '[project]', str_replace('\\', '/', $line));
+        }
+
+        $line = preg_replace('/(password|passwd|pwd|secret|token|api[_-]?key)(\s*[=:]\s*)([^,\s]+)/i', '$1$2[hidden]', $line) ?? $line;
+
+        return substr($line, 0, 900);
+    }
+}
+
+if (!function_exists('admin_api_tail_file')) {
+    function admin_api_tail_file(string $path, int $lineLimit = 30): array
+    {
+        if (!is_file($path) || !is_readable($path)) {
+            return [];
+        }
+
+        $lineLimit = max(1, min(80, $lineLimit));
+        $file = fopen($path, 'rb');
+        if ($file === false) {
+            return [];
+        }
+
+        $buffer = '';
+        $chunkSize = 4096;
+        $position = -1;
+        $lineCount = 0;
+
+        fseek($file, 0, SEEK_END);
+        $fileSize = ftell($file);
+
+        while ($fileSize + $position >= 0 && $lineCount <= $lineLimit) {
+            $seek = max($fileSize + $position - $chunkSize + 1, 0);
+            $readSize = $fileSize + $position - $seek + 1;
+            fseek($file, $seek);
+            $chunk = fread($file, $readSize);
+
+            if ($chunk === false || $chunk === '') {
+                break;
+            }
+
+            $buffer = $chunk . $buffer;
+            $lineCount = substr_count($buffer, "\n");
+            $position -= $chunkSize;
+        }
+
+        fclose($file);
+
+        $lines = preg_split('/\r\n|\r|\n/', trim($buffer)) ?: [];
+        $lines = array_slice(array_filter($lines, static fn (string $line): bool => trim($line) !== ''), -$lineLimit);
+
+        return array_map('admin_api_mask_log_line', $lines);
+    }
+}
+
+if (!function_exists('admin_api_error_log_candidates')) {
+    function admin_api_error_log_candidates(): array
+    {
+        $projectRoot = dirname(__DIR__, 2);
+        $configuredLog = trim((string) ini_get('error_log'));
+        $candidates = [
+            $configuredLog,
+            $projectRoot . '/error_log',
+            dirname($projectRoot) . '/error_log',
+            $projectRoot . '/logs/error_log',
+            $projectRoot . '/storage/logs/error_log',
+        ];
+
+        return array_values(array_unique(array_filter($candidates, static function (string $path): bool {
+            return $path !== '' && strpos(strtolower($path), 'syslog') !== 0;
+        })));
+    }
+}
+
+if (!function_exists('admin_api_error_logs')) {
+    function admin_api_error_logs(int $lineLimit = 30): array
+    {
+        foreach (admin_api_error_log_candidates() as $path) {
+            $lines = admin_api_tail_file($path, $lineLimit);
+
+            if ($lines !== []) {
+                return [
+                    'available' => true,
+                    'source' => basename($path),
+                    'lineCount' => count($lines),
+                    'lines' => $lines,
+                    'checkedAt' => date('c'),
+                ];
+            }
+        }
+
+        return [
+            'available' => false,
+            'source' => '',
+            'lineCount' => 0,
+            'lines' => [],
+            'checkedAt' => date('c'),
+        ];
+    }
+}
+
 if (!function_exists('admin_api_first_by_status')) {
     function admin_api_first_by_status(array $items, string $status = 'Published'): ?array
     {
@@ -250,6 +357,7 @@ if (!function_exists('admin_api_dashboard_data')) {
                 $activityUsernameFilter,
                 200
             ),
+            'errorLogs' => $adminRoleId === 1 ? admin_api_error_logs(30) : null,
             'meta' => [
                 'lastUpdated' => date('c'),
                 'apiBasePath' => api_base_path(),

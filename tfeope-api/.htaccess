@@ -1,22 +1,9 @@
+ErrorDocument 403 errors/403.html
+ErrorDocument 404 errors/404.html
+ErrorDocument 500 errors/500.html
+
 php_value upload_max_filesize 256M
 php_value post_max_size 256M
 php_value max_file_uploads 50
 php_value max_execution_time 300
 php_value max_input_time 300
-#
-# Compatibility rewrite rules
-# Allow callers using either /api or /tfeope-api mount prefixes to reach v1 and media endpoints.
-# These perform internal rewrites (no external redirect), preserving query strings.
-<IfModule mod_rewrite.c>
-	RewriteEngine On
-
-	# Map /api/v1/...  -> /v1/...
-	RewriteRule ^api/v1/(.*)$ /v1/$1 [L,QSA]
-
-	# Map /tfeope-api/v1/... -> /v1/...
-	RewriteRule ^tfeope-api/v1/(.*)$ /v1/$1 [L,QSA]
-
-	# Map /api/media.php -> /media.php (preserve query)
-	RewriteRule ^api/media\.php$ /media.php [L,QSA]
-	RewriteRule ^tfeope-api/media\.php$ /media.php [L,QSA]
-</IfModule>

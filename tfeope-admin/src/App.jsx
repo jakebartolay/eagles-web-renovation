@@ -394,11 +394,55 @@ function generateVideoThumbnail(videoFile) {
   })
 }
 
-function App() {
-  const initialPage = normalizePage(
-    typeof window !== 'undefined' ? window.location.hash : 'dashboard',
-    true,
+function isAdminEntryPath(pathname) {
+  const path = String(pathname || '/').replace(/\/+$/, '') || '/'
+  return path === '/' || path.endsWith('/tfeope-admin') || path.endsWith('/index.php')
+}
+
+function resolveInitialPage() {
+  if (typeof window === 'undefined') {
+    return 'dashboard'
+  }
+
+  if (window.location.hash) {
+    return normalizePage(window.location.hash, true)
+  }
+
+  return isAdminEntryPath(window.location.pathname) ? 'dashboard' : 'notFound'
+}
+
+function AdminNotFoundPage({
+  onPrimary,
+  onSecondary,
+  primaryLabel = 'Dashboard',
+  secondaryLabel = 'Logout',
+  secondaryIcon = 'fa-right-from-bracket',
+}) {
+  return (
+    <div className="admin-not-found" role="alert" aria-labelledby="admin-not-found-title">
+      <div className="admin-not-found__panel">
+        <p className="admin-not-found__eyebrow">404 Error</p>
+        <h1 id="admin-not-found-title">Admin page not found</h1>
+        <p>
+          The admin page you opened is not available or the link is no longer valid.
+        </p>
+        <div className="admin-not-found__actions">
+          <button type="button" className="admin-primary-button" onClick={onPrimary}>
+            <i className="fas fa-house" aria-hidden="true"></i>
+            {primaryLabel}
+          </button>
+          <button type="button" className="admin-secondary-button" onClick={onSecondary}>
+            <i className={`fas ${secondaryIcon}`} aria-hidden="true"></i>
+            {secondaryLabel}
+          </button>
+        </div>
+      </div>
+    </div>
   )
+}
+
+function App() {
+  const initialPage = resolveInitialPage()
 
   const [authChecking, setAuthChecking] = useState(true)
   const [user, setUser] = useState(null)
@@ -3106,6 +3150,23 @@ function App() {
             </div>
           </section>
         </div>
+      </div>
+    )
+  }
+
+  if (activePage === 'notFound') {
+    return (
+      <div
+        className="admin-shell admin-error-mode"
+        style={{ '--admin-login-bg': `url(${ADMIN_BRANDING.backgroundUrl})` }}
+      >
+        <AdminNotFoundPage
+          onPrimary={() => handlePageChange('dashboard')}
+          onSecondary={user ? handleLogout : () => handlePageChange('dashboard')}
+          primaryLabel={user ? 'Dashboard' : 'Admin Login'}
+          secondaryLabel={user ? 'Logout' : 'Reset Link'}
+          secondaryIcon={user ? 'fa-right-from-bracket' : 'fa-rotate-left'}
+        />
       </div>
     )
   }

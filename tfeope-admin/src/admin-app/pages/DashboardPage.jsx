@@ -104,6 +104,43 @@ function ActivityItem({ item }) {
   )
 }
 
+function ErrorLogsPanel({ logs }) {
+  const lines = Array.isArray(logs?.lines) ? logs.lines : []
+  const available = Boolean(logs?.available) && lines.length > 0
+
+  return (
+    <section className="dashboard-panel dashboard-error-logs">
+      <div className="dashboard-panel__header">
+        <div>
+          <p className="page-kicker">Super Admin Only</p>
+          <h3>Server Error Logs</h3>
+        </div>
+        <span className={`dashboard-error-logs__status ${available ? 'active' : 'empty'}`}>
+          <i className={`fas ${available ? 'fa-circle-exclamation' : 'fa-circle-check'}`} aria-hidden="true"></i>
+          {available ? `${lines.length} recent line(s)` : 'No readable logs'}
+        </span>
+      </div>
+
+      {available ? (
+        <>
+          <div className="dashboard-error-logs__meta">
+            <span>Source: {logs?.source || 'error_log'}</span>
+            <span>Checked: {logs?.checkedAt || 'Just now'}</span>
+          </div>
+          <pre className="dashboard-error-logs__list">
+            {lines.join('\n')}
+          </pre>
+        </>
+      ) : (
+        <div className="dashboard-empty-state">
+          <i className="fas fa-file-circle-check" aria-hidden="true"></i>
+          <p>No readable PHP error log was found from the API folder. If deployment fails, check cPanel Error Logs.</p>
+        </div>
+      )}
+    </section>
+  )
+}
+
 function SnapshotRow({ label, icon, value }) {
   return (
     <div className="dashboard-snapshot-row">
@@ -262,6 +299,7 @@ export default function DashboardPage({
 }) {
   const stats = dashboard?.stats || {}
   const activity = Array.isArray(dashboard?.activity) ? dashboard.activity : []
+  const errorLogs = dashboard?.errorLogs || null
   const displayName = resolveUserDisplayName(user)
   const firstName = displayName.split(/\s+/)[0] || 'Admin'
   const accessHelper = isSuperAdmin ? 'Super admin controls enabled' : 'Admin workspace ready'
@@ -513,6 +551,8 @@ export default function DashboardPage({
           </section>
         </div>
       </div>
+
+      {isSuperAdmin ? <ErrorLogsPanel logs={errorLogs} /> : null}
     </section>
   )
 }

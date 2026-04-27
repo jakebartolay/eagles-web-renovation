@@ -1,7 +1,8 @@
-import { FileText, Star, Target, Trophy, Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { FileText, Play, Star, Target, Trophy, Users, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import Skeleton from '@mui/material/Skeleton';
 import Reveal from '../components/Reveal';
+import { PUBLIC_BRANDING } from '../config';
 import { API_ENDPOINTS, extractList, fetchJson, resolveImageFromItem } from '../config/api';
 
 const MEMBER_DISPLAY_CAP = 800;
@@ -39,6 +40,7 @@ const easeOutCubic = (value) => 1 - (1 - value) ** 3;
 
 export default function HomePage() {
   const [memorandums, setMemorandums] = useState([]);
+  const [activeHymnalVideo, setActiveHymnalVideo] = useState(null);
   const [hasMemorandumsResponse, setHasMemorandumsResponse] = useState(false);
   const [hasStatsResponse, setHasStatsResponse] = useState(false);
   const [stats, setStats] = useState(DEFAULT_STATS);
@@ -128,10 +130,44 @@ export default function HomePage() {
     };
   }, [stats.members, stats.years, stats.events, stats.clubs]);
 
+  useEffect(() => {
+    if (!activeHymnalVideo) return undefined;
+
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, [activeHymnalVideo]);
+
   const membersLabel = `${animatedStats.members}+`;
   const yearsLabel = `${animatedStats.years}+`;
   const eventsLabel = `${animatedStats.events}+`;
   const clubsLabel = `${animatedStats.clubs}+`;
+  const hymnalVideos = useMemo(
+    () => [
+      {
+        title: 'Eagles Prayer',
+        description: 'A prayer reflecting faith, unity, and service.',
+        videoUrl: PUBLIC_BRANDING.prayerVideoUrl,
+      },
+      {
+        title: 'National Anthem',
+        description: 'The Philippine National Anthem.',
+        videoUrl: PUBLIC_BRANDING.anthemVideoUrl,
+      },
+      {
+        title: 'Eagles Hymn',
+        description: 'The official hymn of the Philippine Eagles.',
+        videoUrl: PUBLIC_BRANDING.hymnVideoUrl,
+      },
+    ],
+    [],
+  );
 
   return (
     <div className="page home-page">
@@ -190,6 +226,43 @@ export default function HomePage() {
           </>
         )}
       </div>
+
+      <section className="home-hymnals-section">
+        <Reveal>
+          <div className="home-hymnals-panel">
+            <div className="home-hymnals-header">
+              <h2 className="home-hymnals-title">Eagles Hymnals and Prayer</h2>
+              <p className="home-hymnals-subtitle">
+                Sacred songs and prayers that embody faith, patriotism, and brotherhood.
+              </p>
+            </div>
+
+            <div className="home-hymnals-grid">
+              {hymnalVideos.map((item) => (
+                <article className="home-hymnal-card" key={item.title}>
+                  <button
+                    type="button"
+                    className="home-hymnal-video"
+                    onClick={() => setActiveHymnalVideo(item)}
+                    aria-label={`Play ${item.title}`}
+                  >
+                    <video playsInline preload="metadata" muted>
+                      <source src={item.videoUrl} type="video/mp4" />
+                    </video>
+                    <span className="home-hymnal-play" aria-hidden="true">
+                      <Play size={26} fill="currentColor" />
+                    </span>
+                    <span className="home-hymnal-overlay">
+                      <strong>{item.title}</strong>
+                      <span>{item.description}</span>
+                    </span>
+                  </button>
+                </article>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+      </section>
 
       <section className="memorandum-section">
         <Reveal>
@@ -268,8 +341,6 @@ export default function HomePage() {
           </div>
         ) : null}
       </section>
-<<<<<<< HEAD
-=======
 
       {activeHymnalVideo && (
         <div className="home-video-modal" role="dialog" aria-modal="true" aria-label={activeHymnalVideo.title}>
@@ -291,14 +362,9 @@ export default function HomePage() {
             <video className="home-video-modal-player" controls autoPlay playsInline>
               <source src={activeHymnalVideo.videoUrl} type="video/mp4" />
             </video>
-            <div className="home-video-modal-caption">
-              <h3>{activeHymnalVideo.title}</h3>
-              <p>{activeHymnalVideo.description}</p>
-            </div>
           </div>
         </div>
       )}
->>>>>>> parent of c3a5363 (yes ser!!!)
     </div>
   );
 }
