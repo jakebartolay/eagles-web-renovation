@@ -103,6 +103,21 @@ function CardMedia({ src, alt, icon = 'fa-image' }) {
   return <img src={src} alt={alt} className="content-item-image" />
 }
 
+function resolveVideoSourceType(item) {
+  const value = String(item?.videoUrl || item?.videoFilename || '').toLowerCase()
+  if (value.includes('youtube.com') || value.includes('youtu.be')) return 'youtube'
+  if (value.includes('vimeo.com')) return 'vimeo'
+  if (/^https?:\/\//i.test(value)) return 'link'
+  return 'upload'
+}
+
+function videoSourceLabel(type) {
+  if (type === 'youtube') return 'YouTube'
+  if (type === 'vimeo') return 'Vimeo'
+  if (type === 'link') return 'External'
+  return 'Upload'
+}
+
 function DetailTag({ icon, children }) {
   return (
     <span className="content-item-tag">
@@ -444,21 +459,28 @@ export function VideosPage({
                 const thumbnail = String(item?.thumbnailUrl || item?.imageUrl || '').trim()
                 const title = item?.title || 'Untitled video'
                 const description = item?.description || item?.content || 'No description available.'
+                const sourceType = resolveVideoSourceType(item)
 
                 return (
                   <tr key={item?.id || `video-${pageStart + index}`}>
                     <td data-label="ID">{item?.id || 'N/A'}</td>
                     <td data-label="Video">
                       <div className="videos-table__identity">
-                        {thumbnail ? (
-                          <img src={thumbnail} alt={title} className="videos-table__thumb" />
-                        ) : (
-                          <span className="videos-table__thumb videos-table__thumb--fallback">
-                            <i className="fas fa-video" aria-hidden="true"></i>
+                        <div className={`videos-table__media videos-table__media--${sourceType}`}>
+                          {thumbnail ? (
+                            <img src={thumbnail} alt={title} className="videos-table__thumb" />
+                          ) : (
+                            <span className="videos-table__thumb videos-table__thumb--fallback">
+                              <i className="fas fa-video" aria-hidden="true"></i>
+                            </span>
+                          )}
+                          <span className="videos-table__source-pill">
+                            {videoSourceLabel(sourceType)}
                           </span>
-                        )}
+                        </div>
                         <div className="videos-table__identity-copy">
                           <strong>{title}</strong>
+                          <span>{sourceType === 'youtube' ? 'Streaming from YouTube' : sourceType === 'upload' ? 'Hosted media file' : 'External video source'}</span>
                         </div>
                       </div>
                     </td>

@@ -38,6 +38,14 @@ const looksLikeVideoUrl = (value) => {
   return VIDEO_FILE_PATTERN.test(value) || STREAMING_PATTERN.test(value);
 };
 
+const videoSourceType = (value) => {
+  const normalized = String(value || '').toLowerCase();
+  if (normalized.includes('youtube.com') || normalized.includes('youtu.be')) return 'youtube';
+  if (normalized.includes('vimeo.com')) return 'vimeo';
+  if (VIDEO_FILE_PATTERN.test(normalized)) return 'file';
+  return 'link';
+};
+
 const resolveVideoSource = (item) => {
   for (const key of VIDEO_SOURCE_KEYS) {
     const raw = readByPath(item, key);
@@ -206,10 +214,11 @@ export default function VideosPage() {
             ]);
             const videoSource = resolveVideoSource(video);
             const hasPlayableSource = Boolean(videoSource);
+            const sourceType = videoSourceType(videoSource);
 
             return (
               <Reveal key={video.id || `${currentPage}-${idx}`} delay={idx * 60}>
-                <div className="video-card">
+                <div className={`video-card video-card--${sourceType}`}>
                   <div className="video-thumbnail">
                     {videoImage ? (
                       <img src={videoImage} alt={video.title} loading="lazy" decoding="async" />
@@ -227,6 +236,11 @@ export default function VideosPage() {
                     >
                       {hasPlayableSource ? <Play size={26} fill="currentColor" /> : 'N/A'}
                     </button>
+                    {hasPlayableSource ? (
+                      <span className="video-source-badge">
+                        Posted by Admin
+                      </span>
+                    ) : null}
                     <div className="video-card-overlay">
                       <h3 className="video-title">{video.title || 'Untitled Video'}</h3>
                       <p className="video-description">{video.description || ''}</p>

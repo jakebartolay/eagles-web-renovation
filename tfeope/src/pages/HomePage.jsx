@@ -15,6 +15,8 @@ const DEFAULT_STATS = {
 };
 const HOME_STAT_SKELETON_ITEMS = [0, 1, 2, 3];
 const MEMORANDUM_SKELETON_ITEMS = [0, 1, 2];
+const VIDEO_FILE_PATTERN = /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i;
+const youtubeThumbnail = (videoId) => `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
 
 const toSafeNumber = (value) => {
   const parsed = Number(value);
@@ -37,6 +39,26 @@ const extractCount = (payload, preferredListKeys = []) => {
 };
 
 const easeOutCubic = (value) => 1 - (1 - value) ** 3;
+
+const toEmbedVideoUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('youtu.be')) {
+      const videoId = parsed.pathname.replace('/', '').trim();
+      if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+    }
+
+    if (parsed.hostname.includes('youtube.com')) {
+      const videoId = parsed.searchParams.get('v');
+      if (videoId) return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+      if (parsed.pathname.includes('/embed/')) return `${parsed.origin}${parsed.pathname}?autoplay=1&rel=0`;
+    }
+  } catch {
+    return '';
+  }
+
+  return '';
+};
 
 export default function HomePage() {
   const [memorandums, setMemorandums] = useState([]);
@@ -154,20 +176,25 @@ export default function HomePage() {
         title: 'Eagles Prayer',
         description: 'A prayer reflecting faith, unity, and service.',
         videoUrl: PUBLIC_BRANDING.prayerVideoUrl,
+        thumbnailUrl: youtubeThumbnail('e0kMQ-cJIEo'),
       },
       {
         title: 'National Anthem',
         description: 'The Philippine National Anthem.',
         videoUrl: PUBLIC_BRANDING.anthemVideoUrl,
+        thumbnailUrl: youtubeThumbnail('l6gYeAE0l_Y'),
       },
       {
         title: 'Eagles Hymn',
         description: 'The official hymn of the Philippine Eagles.',
         videoUrl: PUBLIC_BRANDING.hymnVideoUrl,
+        thumbnailUrl: youtubeThumbnail('DuZRGwRA0mc'),
       },
     ],
     [],
   );
+  const activeHymnalEmbedUrl = activeHymnalVideo ? toEmbedVideoUrl(activeHymnalVideo.videoUrl) : '';
+  const activeHymnalFileUrl = activeHymnalVideo?.videoUrl || '';
 
   return (
     <div className="page home-page">
@@ -246,9 +273,14 @@ export default function HomePage() {
                     onClick={() => setActiveHymnalVideo(item)}
                     aria-label={`Play ${item.title}`}
                   >
-                    <video playsInline preload="metadata" muted>
-                      <source src={item.videoUrl} type="video/mp4" />
-                    </video>
+                    <img
+                      className="home-hymnal-thumbnail"
+                      src={item.thumbnailUrl}
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      aria-hidden="true"
+                    />
                     <span className="home-hymnal-play" aria-hidden="true">
                       <Play size={26} fill="currentColor" />
                     </span>
@@ -359,9 +391,24 @@ export default function HomePage() {
             >
               <X size={24} />
             </button>
-            <video className="home-video-modal-player" controls autoPlay playsInline>
-              <source src={activeHymnalVideo.videoUrl} type="video/mp4" />
-            </video>
+            {activeHymnalEmbedUrl ? (
+              <iframe
+                className="home-video-modal-player"
+                src={activeHymnalEmbedUrl}
+                title={activeHymnalVideo.title}
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
+              />
+            ) : VIDEO_FILE_PATTERN.test(activeHymnalFileUrl) ? (
+              <video className="home-video-modal-player" controls autoPlay playsInline>
+                <source src={activeHymnalFileUrl} type="video/mp4" />
+              </video>
+            ) : (
+              <div className="home-video-modal-player home-video-modal-fallback">
+                <p>Unable to play this video source.</p>
+                <a href={activeHymnalFileUrl} target="_blank" rel="noreferrer">Open video</a>
+              </div>
+            )}
           </div>
         </div>
       )}

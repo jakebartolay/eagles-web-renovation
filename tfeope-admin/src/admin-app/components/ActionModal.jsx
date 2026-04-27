@@ -303,6 +303,13 @@ function VideoFilesNote({ videoForm, isEditingVideo }) {
 
   return (
     <>
+      {videoForm?.videoLink ? (
+        <div className="admin-modal-note">
+          <span>Current video link</span>
+          <small>{videoForm.videoLink}</small>
+        </div>
+      ) : null}
+
       {videoForm?.thumbnailUrl ? (
         <div className="admin-modal-note media">
           <span>Current thumbnail</span>
@@ -552,16 +559,43 @@ export default function ActionModal({
                 </select>
               </Field>
 
-              <Field label="Video file">
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={(event) => onVideoFieldChange('video', event.target.files?.[0] || null)}
-                  required={!isEditingVideo}
-                />
+              <Field label="Video source">
+                <select
+                  value={videoForm?.sourceType || 'upload'}
+                  onChange={(event) => onVideoFieldChange('sourceType', event.target.value)}
+                >
+                  <option value="upload">Upload MP4/video file</option>
+                  <option value="link">YouTube or video link</option>
+                </select>
               </Field>
 
-              <Field label="Thumbnail" helper="Optional. If empty, thumbnail will be auto-generated from the uploaded video.">
+              {videoForm?.sourceType === 'link' ? (
+                <Field label="YouTube/video link" helper="Paste a YouTube, Vimeo, or direct video URL.">
+                  <input
+                    type="url"
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    value={videoForm?.videoLink || ''}
+                    onChange={(event) => onVideoFieldChange('videoLink', event.target.value)}
+                    required
+                  />
+                </Field>
+              ) : (
+                <Field label="Video file">
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={(event) => onVideoFieldChange('video', event.target.files?.[0] || null)}
+                    required={!isEditingVideo}
+                  />
+                </Field>
+              )}
+
+              <Field
+                label="Thumbnail"
+                helper={videoForm?.sourceType === 'link'
+                  ? 'Optional image upload for the video card. YouTube videos can still play without this.'
+                  : 'Optional. If empty, thumbnail will be auto-generated from the uploaded video.'}
+              >
                 <input
                   type="file"
                   accept="image/*"

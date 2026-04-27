@@ -311,6 +311,36 @@ function toThumbnailFilename(videoName) {
   return `${base || 'video'}_thumb.jpg`
 }
 
+function isExternalVideoSource(value) {
+  return /^https?:\/\//i.test(String(value || '').trim())
+}
+
+function youtubeVideoId(value) {
+  try {
+    const url = new URL(String(value || '').trim())
+    if (url.hostname.includes('youtu.be')) {
+      return url.pathname.replace('/', '').trim()
+    }
+
+    if (url.hostname.includes('youtube.com')) {
+      const watchId = url.searchParams.get('v')
+      if (watchId) return watchId
+      const parts = url.pathname.split('/').filter(Boolean)
+      const embedIndex = parts.indexOf('embed')
+      if (embedIndex >= 0) return parts[embedIndex + 1] || ''
+    }
+  } catch {
+    return ''
+  }
+
+  return ''
+}
+
+function youtubeThumbnailUrl(value) {
+  const id = youtubeVideoId(value)
+  return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : ''
+}
+
 function generateVideoThumbnail(videoFile) {
   return new Promise((resolve, reject) => {
     if (!(videoFile instanceof File)) {
@@ -497,7 +527,9 @@ function App() {
     title: '',
     description: '',
     status: 'Published',
+    sourceType: 'upload',
     video: null,
+    videoLink: '',
     videoUrl: '',
     videoFilename: '',
     thumbnail: null,
@@ -661,7 +693,9 @@ function App() {
       title: '',
       description: '',
       status: 'Published',
+      sourceType: 'upload',
       video: null,
+      videoLink: '',
       videoUrl: '',
       videoFilename: '',
       thumbnail: null,
@@ -1296,12 +1330,16 @@ function App() {
   }
 
   function openVideoEditor(item) {
+    const storedVideo = String(item?.videoFilename || item?.videoUrl || '').trim()
+    const externalVideo = isExternalVideoSource(storedVideo)
     setVideoComposer({
       id: String(item?.id || '').trim(),
       title: String(item?.title || '').trim(),
       description: String(item?.description || '').trim(),
       status: String(item?.status || 'Published').trim() || 'Published',
+      sourceType: externalVideo ? 'link' : 'upload',
       video: null,
+      videoLink: externalVideo ? storedVideo : '',
       videoUrl: String(item?.videoUrl || '').trim(),
       videoFilename: String(item?.videoFilename || '').trim(),
       thumbnail: null,
@@ -1500,7 +1538,28 @@ function App() {
   }
 
   function updateVideoComposer(field, value) {
-    setVideoComposer((current) => ({ ...current, [field]: value }))
+    setVideoComposer((current) => {
+      if (field === 'sourceType') {
+        return {
+          ...current,
+          sourceType: value,
+          video: value === 'link' ? null : current.video,
+          videoLink: value === 'upload' ? '' : current.videoLink,
+        }
+      }
+
+      if (field === 'videoLink') {
+        const thumbnailUrl = youtubeThumbnailUrl(value)
+        return {
+          ...current,
+          videoLink: value,
+          thumbnailUrl: thumbnailUrl || current.thumbnailUrl,
+          thumbnailFilename: thumbnailUrl || current.thumbnailFilename,
+        }
+      }
+
+      return { ...current, [field]: value }
+    })
   }
 
   function updateEventComposer(field, value) {
@@ -1939,12 +1998,19 @@ function App() {
       setNotice('')
 
       const trimmedTitle = String(videoComposer.title || '').trim()
+      const videoSourceType = String(videoComposer.sourceType || 'upload')
+      const videoLink = String(videoComposer.videoLink || '').trim()
       if (trimmedTitle === '') {
         setError('Video title is required.')
         return
       }
 
-      if (actionModal !== 'editVideo' && !videoComposer.video) {
+      if (videoSourceType === 'link' && videoLink === '') {
+        setError('Please enter a YouTube or video link.')
+        return
+      }
+
+      if (videoSourceType === 'upload' && actionModal !== 'editVideo' && !videoComposer.video) {
         setError('Please choose a video file first.')
         return
       }
@@ -1956,11 +2022,14 @@ function App() {
       formData.append('title', trimmedTitle)
       formData.append('description', String(videoComposer.description || '').trim())
       formData.append('status', String(videoComposer.status || 'Published').trim() || 'Published')
-      if (videoComposer.video) {
+      if (videoSourceType === 'link') {
+        formData.append('video_url', videoLink)
+      }
+      if (videoSourceType === 'upload' && videoComposer.video) {
         formData.append('video', videoComposer.video)
       }
       let thumbnailFile = videoComposer.thumbnail
-      if (!thumbnailFile && videoComposer.video) {
+      if (!thumbnailFile && videoSourceType === 'upload' && videoComposer.video) {
         try {
           thumbnailFile = await generateVideoThumbnail(videoComposer.video)
         } catch (thumbnailError) {

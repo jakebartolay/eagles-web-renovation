@@ -678,11 +678,27 @@ p {
   cursor: pointer;
 }
 
-.home-hymnal-video video {
+.home-hymnal-video video,
+.home-hymnal-video-placeholder,
+.home-hymnal-thumbnail {
   width: 100%;
   height: 100%;
-  object-fit: cover;
   display: block;
+}
+
+.home-hymnal-video video,
+.home-hymnal-thumbnail {
+  object-fit: cover;
+}
+
+.home-hymnal-video-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.74);
+  background:
+    linear-gradient(135deg, rgba(16, 40, 74, 0.88), rgba(15, 23, 42, 0.94)),
+    radial-gradient(circle at 50% 40%, rgba(202, 159, 67, 0.42), transparent 42%);
 }
 
 .home-hymnal-video::after {
@@ -802,7 +818,22 @@ p {
   width: 100%;
   aspect-ratio: 16 / 9;
   display: block;
+  border: 0;
   background: #000;
+}
+
+.home-video-modal-fallback {
+  display: grid;
+  place-items: center;
+  gap: 0.8rem;
+  padding: 2rem;
+  color: #fff;
+  text-align: center;
+}
+
+.home-video-modal-fallback a {
+  color: #f1d38a;
+  font-weight: 800;
 }
 
 /* Home Memorandum */
@@ -3540,12 +3571,12 @@ p {
 /* Videos */
 .videos-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 340px));
-  gap: 1.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 320px));
+  gap: 1rem;
   grid-auto-rows: auto;
   align-items: start;
   justify-content: center;
-  min-height: clamp(620px, 78vh, 980px);
+  min-height: 0;
 }
 
 .videos-grid > div {
@@ -3553,11 +3584,13 @@ p {
 }
 
 .video-card {
+  position: relative;
   background: #0f172a;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: var(--shadow);
-  transition: all 0.3s;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.18);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
   height: auto;
   display: flex;
   flex-direction: column;
@@ -3585,8 +3618,10 @@ p {
   position: relative;
   width: 100%;
   height: auto;
-  aspect-ratio: 4 / 3;
-  background: var(--eagle-primary);
+  aspect-ratio: 16 / 10;
+  background:
+    radial-gradient(circle at top left, rgba(202, 159, 67, 0.38), transparent 34%),
+    linear-gradient(135deg, #0f172a, #10284a);
   overflow: hidden;
 }
 
@@ -3598,6 +3633,18 @@ p {
     radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.08), rgba(0, 0, 0, 0.38)),
     rgba(0, 0, 0, 0.18);
   transition: background 0.22s ease;
+}
+
+.video-card--youtube .video-thumbnail::before,
+.video-card--vimeo .video-thumbnail::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(135deg, rgba(255, 0, 0, 0.28), transparent 34%),
+    linear-gradient(0deg, rgba(15, 23, 42, 0.58), transparent 62%);
+  pointer-events: none;
 }
 
 .video-card:hover .video-thumbnail::after {
@@ -3672,6 +3719,30 @@ p {
   color: #fff;
   text-align: left;
   pointer-events: none;
+}
+
+.video-source-badge {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0.32rem 0.58rem;
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  backdrop-filter: blur(10px);
+}
+
+.video-card--youtube .video-source-badge {
+  background: rgba(15, 23, 42, 0.72);
 }
 
 .video-title {

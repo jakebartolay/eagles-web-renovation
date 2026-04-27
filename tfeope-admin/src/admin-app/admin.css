@@ -1047,6 +1047,55 @@
   color: var(--admin-muted);
 }
 
+.videos-table__media {
+  position: relative;
+  flex: 0 0 auto;
+  width: 86px;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at top left, rgba(202, 159, 67, 0.22), transparent 46%),
+    linear-gradient(135deg, rgba(16, 40, 74, 0.96), rgba(18, 53, 95, 0.92));
+  box-shadow: 0 10px 24px rgba(19, 35, 61, 0.14);
+}
+
+.videos-table__media .videos-table__thumb {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  border: 0;
+}
+
+.videos-table__media--youtube::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgba(202, 37, 37, 0.3), transparent 42%),
+    linear-gradient(0deg, rgba(13, 35, 66, 0.36), transparent 64%);
+  pointer-events: none;
+}
+
+.videos-table__source-pill {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  z-index: 1;
+  padding: 4px 7px;
+  border-radius: 7px;
+  color: #fff;
+  background: rgba(13, 35, 66, 0.78);
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.videos-table__media--youtube .videos-table__source-pill {
+  background: rgba(197, 31, 31, 0.92);
+}
+
 .members-table__identity-copy,
 .events-table__identity-copy,
 .memorandum-table__identity-copy,
