@@ -1819,8 +1819,8 @@ function App() {
       if (regionId <= 0 && regionName === '') {
         if (createdGovernor && clubName === '') {
           await runAdminRefresh({ silent: true })
-          setActivePage('members')
-          setOpenGroups((current) => ({ ...current, members: true }))
+          setActivePage('governors')
+          setOpenGroups((current) => ({ ...current, leadership: true }))
           setNotice(`Saved governor ${normalizedGovernorName} successfully.`)
           closeActionModal(true)
           resetRegionClubComposer()
@@ -1854,8 +1854,8 @@ function App() {
         normalizedRegionName = String(regionPayload?.data?.name || regionName).trim() || regionName
 
         await runAdminRefresh({ silent: true })
-        setActivePage('members')
-        setOpenGroups((current) => ({ ...current, members: true }))
+        setActivePage('governors')
+        setOpenGroups((current) => ({ ...current, leadership: true }))
         if (normalizedRegionName !== '' && selectedGovernorPair.regionName !== '') {
           setNotice(`Updated region ${selectedGovernorPair.regionName} to ${normalizedRegionName} successfully.`)
         } else {
@@ -1910,8 +1910,8 @@ function App() {
       }
 
       await runAdminRefresh({ silent: true })
-      setActivePage('members')
-      setOpenGroups((current) => ({ ...current, members: true }))
+      setActivePage('governors')
+      setOpenGroups((current) => ({ ...current, leadership: true }))
       if (createdGovernor && normalizedClubName !== '') {
         setNotice(`Saved governor ${normalizedGovernorName}, region ${normalizedRegionName}, and club ${normalizedClubName}.`)
       } else if (createdGovernor) {
