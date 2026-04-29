@@ -29,6 +29,7 @@ try {
     $title = trim((string) ($payload['title'] ?? $payload['video_title'] ?? ''));
     $description = trim((string) ($payload['description'] ?? $payload['video_description'] ?? ''));
     $status = api_normalize_publication_status($payload['status'] ?? $payload['video_status'] ?? 'Draft');
+    $videoUrl = trim((string) ($payload['video_url'] ?? $payload['videoUrl'] ?? ''));
 
     if ($title === '') {
         api_json([
@@ -38,19 +39,34 @@ try {
     }
 
     $videoUpload = $_FILES['video'] ?? $_FILES['video_file'] ?? null;
-    if (!is_array($videoUpload) || (int) ($videoUpload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+    $hasVideoUpload = is_array($videoUpload) && (int) ($videoUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+    $hasVideoUrl = $videoUrl !== '';
+
+    if (!$hasVideoUpload && !$hasVideoUrl) {
         api_json([
             'success' => false,
-            'message' => 'A video file is required.',
+            'message' => 'A video file or YouTube link is required.',
+        ], 422);
+    }
+
+    if ($hasVideoUrl && !filter_var($videoUrl, FILTER_VALIDATE_URL)) {
+        api_json([
+            'success' => false,
+            'message' => 'Please enter a valid video URL.',
         ], 422);
     }
 
     $thumbnailUpload = $_FILES['thumbnail'] ?? $_FILES['video_thumbnail'] ?? null;
-    $storedVideo = api_store_uploaded_file($videoUpload, 'videos', api_video_extensions());
+    $storedVideo = $hasVideoUpload ? api_store_uploaded_file($videoUpload, 'videos', api_video_extensions()) : null;
     $storedThumbnail = null;
 
     if (is_array($thumbnailUpload) && (int) ($thumbnailUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
         $storedThumbnail = api_store_uploaded_file($thumbnailUpload, 'videos_thumbnail', api_image_extensions());
+    }
+
+    $thumbnailValue = $storedThumbnail['filename'] ?? '';
+    if ($thumbnailValue === '' && $hasVideoUrl) {
+        $thumbnailValue = api_youtube_thumbnail_url($videoUrl);
     }
 
     $db->beginTransaction();
@@ -73,8 +89,8 @@ try {
         ', [
             ':video_title' => $title,
             ':video_description' => $description !== '' ? $description : null,
-            ':video_file' => $storedVideo['filename'],
-            ':video_thumbnail' => $storedThumbnail['filename'] ?? '',
+            ':video_file' => $storedVideo['filename'] ?? $videoUrl,
+            ':video_thumbnail' => $thumbnailValue,
             ':video_status' => $status,
         ]);
 

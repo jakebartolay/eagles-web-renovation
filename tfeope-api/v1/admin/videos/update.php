@@ -45,6 +45,7 @@ try {
     $title = trim((string) ($payload['title'] ?? $payload['video_title'] ?? $current['video_title'] ?? ''));
     $description = trim((string) ($payload['description'] ?? $payload['video_description'] ?? $current['video_description'] ?? ''));
     $status = api_normalize_publication_status($payload['status'] ?? $payload['video_status'] ?? $current['video_status'] ?? 'Draft');
+    $videoUrl = trim((string) ($payload['video_url'] ?? $payload['videoUrl'] ?? ''));
 
     if ($title === '') {
         api_json([
@@ -63,11 +64,26 @@ try {
         $storedVideo = api_store_uploaded_file($videoUpload, 'videos', api_video_extensions());
     }
 
+    if ($videoUrl !== '' && !filter_var($videoUrl, FILTER_VALIDATE_URL)) {
+        api_json([
+            'ok' => false,
+            'message' => 'Please enter a valid video URL.',
+        ], 422);
+    }
+
     if (is_array($thumbnailUpload) && (int) ($thumbnailUpload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE) {
         $storedThumbnail = api_store_uploaded_file($thumbnailUpload, 'videos_thumbnail', api_image_extensions());
     }
 
     try {
+        $nextThumbnail = $storedThumbnail['filename'] ?? (string) ($current['video_thumbnail'] ?? '');
+        if ($storedThumbnail === null && $videoUrl !== '' && !api_is_external_url($nextThumbnail)) {
+            $youtubeThumbnail = api_youtube_thumbnail_url($videoUrl);
+            if ($youtubeThumbnail !== '') {
+                $nextThumbnail = $youtubeThumbnail;
+            }
+        }
+
         api_execute($db, '
             UPDATE video_info
             SET video_title = :video_title,
@@ -80,8 +96,8 @@ try {
             ':video_id' => $videoId,
             ':video_title' => $title,
             ':video_description' => $description !== '' ? $description : null,
-            ':video_file' => $storedVideo['filename'] ?? (string) ($current['video_file'] ?? ''),
-            ':video_thumbnail' => $storedThumbnail['filename'] ?? (string) ($current['video_thumbnail'] ?? ''),
+            ':video_file' => $storedVideo['filename'] ?? ($videoUrl !== '' ? $videoUrl : (string) ($current['video_file'] ?? '')),
+            ':video_thumbnail' => $nextThumbnail,
             ':video_status' => $status,
         ]);
     } catch (Throwable $error) {
@@ -90,7 +106,7 @@ try {
         throw $error;
     }
 
-    if ($storedVideo !== null) {
+    if ($storedVideo !== null || ($videoUrl !== '' && !api_is_external_url((string) ($current['video_file'] ?? '')))) {
         api_delete_uploaded_file('videos', (string) ($current['video_file'] ?? ''));
     }
 

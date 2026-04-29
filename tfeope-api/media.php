@@ -31,6 +31,6 @@ if ($finfo) {
 
 header('Content-Type: ' . $mimeType);
 header('Content-Length: ' . (string) filesize($fullPath));
-header('Cache-Control: public, max-age=86400');
+header('Cache-Control: public, max-age=604800, stale-while-revalidate=86400');
 readfile($fullPath);
 exit;

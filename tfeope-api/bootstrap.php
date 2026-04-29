@@ -632,6 +632,55 @@ if (!function_exists('api_asset_url_or_fallback')) {
     }
 }
 
+if (!function_exists('api_is_external_url')) {
+    function api_is_external_url(?string $value): bool
+    {
+        $url = trim((string) $value);
+        return $url !== '' && (bool) preg_match('/^https?:\/\//i', $url);
+    }
+}
+
+if (!function_exists('api_youtube_video_id')) {
+    function api_youtube_video_id(string $url): string
+    {
+        $parts = parse_url(trim($url));
+        if (!is_array($parts)) {
+            return '';
+        }
+
+        $host = strtolower((string) ($parts['host'] ?? ''));
+        $path = trim((string) ($parts['path'] ?? ''), '/');
+
+        if (strpos($host, 'youtu.be') !== false) {
+            return preg_replace('/[^a-zA-Z0-9_-]/', '', explode('/', $path)[0] ?? '') ?? '';
+        }
+
+        if (strpos($host, 'youtube.com') !== false) {
+            parse_str((string) ($parts['query'] ?? ''), $query);
+            $watchId = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) ($query['v'] ?? '')) ?? '';
+            if ($watchId !== '') {
+                return $watchId;
+            }
+
+            $segments = explode('/', $path);
+            $embedIndex = array_search('embed', $segments, true);
+            if ($embedIndex !== false && isset($segments[$embedIndex + 1])) {
+                return preg_replace('/[^a-zA-Z0-9_-]/', '', $segments[$embedIndex + 1]) ?? '';
+            }
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('api_youtube_thumbnail_url')) {
+    function api_youtube_thumbnail_url(string $url): string
+    {
+        $videoId = api_youtube_video_id($url);
+        return $videoId !== '' ? 'https://img.youtube.com/vi/' . $videoId . '/hqdefault.jpg' : '';
+    }
+}
+
 if (!function_exists('api_path_is_within')) {
     function api_path_is_within(string $path, string $root): bool
     {
@@ -749,6 +798,192 @@ if (!function_exists('api_request_ip')) {
     }
 }
 
+if (!function_exists('api_image_upload_options')) {
+    function api_image_upload_options(string $group): array
+    {
+        return match ($group) {
+            'members' => ['max_width' => 900, 'max_height' => 900, 'quality' => 82],
+            'videos_thumbnail' => ['max_width' => 1280, 'max_height' => 720, 'quality' => 80],
+            'news', 'event_media', 'magna_carta' => ['max_width' => 1600, 'max_height' => 1200, 'quality' => 82],
+            'governors', 'past-leaders', 'media' => ['max_width' => 1200, 'max_height' => 1200, 'quality' => 82],
+            'memorandum' => ['max_width' => 1800, 'max_height' => 2400, 'quality' => 86],
+            default => ['max_width' => 1400, 'max_height' => 1400, 'quality' => 82],
+        };
+    }
+}
+
+if (!function_exists('api_should_optimize_image_upload')) {
+    function api_should_optimize_image_upload(string $extension): bool
+    {
+        $extension = strtolower($extension);
+        return in_array($extension, ['jpeg', 'jpg', 'jfif', 'png', 'webp', 'bmp'], true)
+            && function_exists('imagecreatefromstring')
+            && (function_exists('imagewebp') || function_exists('imagejpeg'));
+    }
+}
+
+if (!function_exists('api_unique_upload_path')) {
+    function api_unique_upload_path(
+        string $targetDir,
+        string $baseName,
+        string $extension,
+        bool $overwrite = false
+    ): array {
+        $extension = strtolower(trim($extension, '.'));
+        $filename = $baseName . ($extension !== '' ? '.' . $extension : '');
+        $targetPath = $targetDir . '/' . $filename;
+
+        if ($overwrite) {
+            foreach (glob($targetDir . '/' . $baseName . '.*') ?: [] as $existingVariant) {
+                if (is_file($existingVariant)) {
+                    @unlink($existingVariant);
+                }
+            }
+
+            if (is_file($targetPath)) {
+                @unlink($targetPath);
+            }
+
+            return [$filename, $targetPath];
+        }
+
+        $counter = 2;
+        while (is_file($targetPath)) {
+            $filename = $baseName . '_' . $counter . ($extension !== '' ? '.' . $extension : '');
+            $targetPath = $targetDir . '/' . $filename;
+            $counter++;
+        }
+
+        return [$filename, $targetPath];
+    }
+}
+
+if (!function_exists('api_save_optimized_uploaded_image')) {
+    function api_save_optimized_uploaded_image(
+        string $tmpName,
+        string $targetDir,
+        string $baseName,
+        string $group,
+        bool $overwrite = false
+    ): ?array {
+        $imageData = file_get_contents($tmpName);
+        if ($imageData === false) {
+            return null;
+        }
+
+        $sourceImage = @imagecreatefromstring($imageData);
+        if ($sourceImage === false) {
+            return null;
+        }
+
+        $sourceWidth = imagesx($sourceImage);
+        $sourceHeight = imagesy($sourceImage);
+        if ($sourceWidth <= 0 || $sourceHeight <= 0) {
+            imagedestroy($sourceImage);
+            return null;
+        }
+
+        $options = api_image_upload_options($group);
+        $maxWidth = max(1, (int) ($options['max_width'] ?? 1400));
+        $maxHeight = max(1, (int) ($options['max_height'] ?? 1400));
+        $quality = max(1, min(100, (int) ($options['quality'] ?? 82)));
+        $scale = min(1, $maxWidth / $sourceWidth, $maxHeight / $sourceHeight);
+        $targetWidth = max(1, (int) round($sourceWidth * $scale));
+        $targetHeight = max(1, (int) round($sourceHeight * $scale));
+
+        $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+        if ($canvas === false) {
+            imagedestroy($sourceImage);
+            return null;
+        }
+
+        imagealphablending($canvas, false);
+        imagesavealpha($canvas, true);
+        $transparent = imagecolorallocatealpha($canvas, 255, 255, 255, 127);
+        imagefill($canvas, 0, 0, $transparent);
+
+        if (!imagecopyresampled(
+            $canvas,
+            $sourceImage,
+            0,
+            0,
+            0,
+            0,
+            $targetWidth,
+            $targetHeight,
+            $sourceWidth,
+            $sourceHeight
+        )) {
+            imagedestroy($sourceImage);
+            imagedestroy($canvas);
+            return null;
+        }
+
+        imagedestroy($sourceImage);
+
+        $targetExtension = function_exists('imagewebp') ? 'webp' : 'jpg';
+        [$filename, $targetPath] = api_unique_upload_path($targetDir, $baseName, $targetExtension, $overwrite);
+        $saved = false;
+
+        if ($targetExtension === 'webp') {
+            $saved = imagewebp($canvas, $targetPath, $quality);
+        } else {
+            $jpegCanvas = imagecreatetruecolor($targetWidth, $targetHeight);
+            if ($jpegCanvas !== false) {
+                $background = imagecolorallocate($jpegCanvas, 255, 255, 255);
+                imagefill($jpegCanvas, 0, 0, $background);
+                imagecopy($jpegCanvas, $canvas, 0, 0, 0, 0, $targetWidth, $targetHeight);
+                $saved = imagejpeg($jpegCanvas, $targetPath, $quality);
+                imagedestroy($jpegCanvas);
+            }
+        }
+
+        imagedestroy($canvas);
+
+        if (!$saved) {
+            @unlink($targetPath);
+            return null;
+        }
+
+        return [
+            'filename' => $filename,
+            'path' => $targetPath,
+            'optimized' => true,
+            'width' => $targetWidth,
+            'height' => $targetHeight,
+        ];
+    }
+}
+
+if (!function_exists('api_save_uploaded_file_to_path')) {
+    function api_save_uploaded_file_to_path(
+        string $tmpName,
+        string $targetDir,
+        string $baseName,
+        string $extension,
+        string $group,
+        bool $overwrite = false
+    ): array {
+        if (api_should_optimize_image_upload($extension)) {
+            $optimized = api_save_optimized_uploaded_image($tmpName, $targetDir, $baseName, $group, $overwrite);
+            if ($optimized !== null) {
+                return $optimized;
+            }
+        }
+
+        [$filename, $targetPath] = api_unique_upload_path($targetDir, $baseName, $extension, $overwrite);
+        if (!move_uploaded_file($tmpName, $targetPath)) {
+            throw new RuntimeException('Failed to save uploaded file.');
+        }
+
+        return [
+            'filename' => $filename,
+            'path' => $targetPath,
+            'optimized' => false,
+        ];
+    }
+}
+
 if (!function_exists('api_store_uploaded_file')) {
     function api_store_uploaded_file(array $file, string $group, ?array $allowedExtensions = null): array
     {
@@ -776,20 +1011,13 @@ if (!function_exists('api_store_uploaded_file')) {
             throw new RuntimeException('Unsupported file type.');
         }
 
-        $filename = str_replace('.', '', uniqid('', true));
-        if ($extension !== '') {
-            $filename .= '.' . $extension;
-        }
-
-        $targetPath = $targetDir . '/' . $filename;
-        if (!move_uploaded_file($tmpName, $targetPath)) {
-            throw new RuntimeException('Failed to save uploaded file.');
-        }
+        $baseName = str_replace('.', '', uniqid('', true));
+        $storedFile = api_save_uploaded_file_to_path($tmpName, $targetDir, $baseName, $extension, $group);
 
         return [
-            'filename' => $filename,
-            'path' => $targetPath,
-            'url' => api_media_url($group, $filename),
+            'filename' => $storedFile['filename'],
+            'path' => $storedFile['path'],
+            'url' => api_media_url($group, $storedFile['filename']),
         ];
     }
 }
@@ -831,29 +1059,12 @@ if (!function_exists('api_store_uploaded_file_as')) {
             $safeBaseName = 'file';
         }
 
-        $filename = $safeBaseName . '.' . $extension;
-        if (!$overwrite) {
-            $counter = 2;
-
-            while (is_file($targetDir . '/' . $filename)) {
-                $filename = $safeBaseName . '_' . $counter . '.' . $extension;
-                $counter++;
-            }
-        }
-
-        $targetPath = $targetDir . '/' . $filename;
-        if ($overwrite && is_file($targetPath)) {
-            @unlink($targetPath);
-        }
-
-        if (!move_uploaded_file($tmpName, $targetPath)) {
-            throw new RuntimeException('Failed to save uploaded file.');
-        }
+        $storedFile = api_save_uploaded_file_to_path($tmpName, $targetDir, $safeBaseName, $extension, $group, $overwrite);
 
         return [
-            'filename' => $filename,
-            'path' => $targetPath,
-            'url' => api_media_url($group, $filename),
+            'filename' => $storedFile['filename'],
+            'path' => $storedFile['path'],
+            'url' => api_media_url($group, $storedFile['filename']),
         ];
     }
 }
@@ -898,7 +1109,13 @@ if (!function_exists('api_store_uploaded_image_as_jpeg')) {
 
             $width = imagesx($sourceImage);
             $height = imagesy($sourceImage);
-            $canvas = imagecreatetruecolor($width, $height);
+            $options = api_image_upload_options($group);
+            $maxWidth = max(1, (int) ($options['max_width'] ?? 1800));
+            $maxHeight = max(1, (int) ($options['max_height'] ?? 2400));
+            $scale = min(1, $maxWidth / $width, $maxHeight / $height);
+            $targetWidth = max(1, (int) round($width * $scale));
+            $targetHeight = max(1, (int) round($height * $scale));
+            $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
 
             if ($canvas === false) {
                 imagedestroy($sourceImage);
@@ -907,7 +1124,18 @@ if (!function_exists('api_store_uploaded_image_as_jpeg')) {
 
             $background = imagecolorallocate($canvas, 255, 255, 255);
             imagefill($canvas, 0, 0, $background);
-            imagecopy($canvas, $sourceImage, 0, 0, 0, 0, $width, $height);
+            imagecopyresampled(
+                $canvas,
+                $sourceImage,
+                0,
+                0,
+                0,
+                0,
+                $targetWidth,
+                $targetHeight,
+                $width,
+                $height
+            );
             imagedestroy($sourceImage);
 
             $targetDir = api_upload_dir($group);
@@ -1312,8 +1540,8 @@ if (!function_exists('api_video_payload')) {
     {
         $videoFile = trim((string) ($row['video_file'] ?? ''));
         $thumbnailFile = trim((string) ($row['video_thumbnail'] ?? ''));
-        $videoAsset = api_locate_media_file('videos', $videoFile);
-        $thumbnailAsset = api_locate_media_file(['videos_thumbnail', 'media'], $thumbnailFile);
+        $videoAsset = api_is_external_url($videoFile) ? null : api_locate_media_file('videos', $videoFile);
+        $thumbnailAsset = api_is_external_url($thumbnailFile) ? null : api_locate_media_file(['videos_thumbnail', 'media'], $thumbnailFile);
 
         return [
             'id' => (int) ($row['video_id'] ?? 0),
@@ -1323,9 +1551,9 @@ if (!function_exists('api_video_payload')) {
             'status' => (string) ($row['video_status'] ?? 'Draft'),
             'createdAt' => (string) ($row['created_at'] ?? ''),
             'videoFilename' => $videoFile !== '' ? $videoFile : null,
-            'videoUrl' => api_asset_url_or_fallback($videoAsset, 'videos', $videoFile),
+            'videoUrl' => api_is_external_url($videoFile) ? $videoFile : api_asset_url_or_fallback($videoAsset, 'videos', $videoFile),
             'thumbnailFilename' => $thumbnailFile !== '' ? $thumbnailFile : null,
-            'thumbnailUrl' => api_asset_url_or_fallback($thumbnailAsset, 'videos_thumbnail', $thumbnailFile),
+            'thumbnailUrl' => api_is_external_url($thumbnailFile) ? $thumbnailFile : api_asset_url_or_fallback($thumbnailAsset, 'videos_thumbnail', $thumbnailFile),
         ];
     }
 }

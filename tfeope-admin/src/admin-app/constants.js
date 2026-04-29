@@ -117,6 +117,13 @@ export const pageMeta = {
     description: 'Inspect recent admin actions, timelines, and operational changes.',
     searchPlaceholder: 'Search activity by admin, action type, or description',
   },
+  fileManager: {
+    title: 'File Manager',
+    eyebrow: 'Super Admin Tools',
+    description: 'Manage allowed project files and uploads without opening cPanel.',
+    searchPlaceholder: 'Search files and folders',
+    superAdminOnly: true,
+  },
 }
 
 export const navSections = [
@@ -211,6 +218,13 @@ export const navSections = [
     page: 'activity',
     label: 'Activity',
     icon: 'fa-clock-rotate-left',
+  },
+  {
+    kind: 'page',
+    page: 'fileManager',
+    label: 'File Manager',
+    icon: 'fa-folder-tree',
+    superAdminOnly: true,
   },
 ]
 

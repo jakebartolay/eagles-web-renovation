@@ -1763,6 +1763,231 @@
   gap: 12px;
 }
 
+.file-manager-page {
+  gap: 20px;
+}
+
+.file-manager-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(220px, 1fr) minmax(260px, 1fr);
+  gap: 14px;
+  align-items: end;
+}
+
+.file-manager-folder-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.file-manager-upload {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-manager-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-manager-upload.disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.file-manager-breadcrumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.file-manager-breadcrumbs button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--admin-line-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--admin-navy);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.file-manager-selection-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--admin-line-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.file-manager-selection-bar span {
+  margin-right: auto;
+  color: var(--admin-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.file-manager-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.38fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.file-manager-list,
+.file-manager-detail,
+.file-manager-editor {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.file-manager-row,
+.file-manager-detail,
+.file-manager-editor {
+  border: 1px solid var(--admin-line-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.file-manager-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  color: var(--admin-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.file-manager-row:hover,
+.file-manager-row.active,
+.file-manager-row.checked {
+  border-color: rgba(202, 159, 67, 0.36);
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.file-manager-row__check {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--admin-line-strong);
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--admin-muted);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.file-manager-row.checked .file-manager-row__check {
+  color: #231b0b;
+  border-color: rgba(202, 159, 67, 0.48);
+  background: linear-gradient(135deg, #f4cb6b, #d4a340);
+}
+
+.file-manager-row__icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(16, 40, 74, 0.08);
+  color: var(--admin-navy);
+}
+
+.file-manager-row__main,
+.file-manager-detail__header > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.file-manager-row__main strong,
+.file-manager-detail__header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-manager-row__main small,
+.file-manager-row__meta,
+.file-manager-detail__header small {
+  color: var(--admin-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.file-manager-detail {
+  padding: 16px;
+}
+
+.file-manager-detail__header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.file-manager-detail__actions,
+.file-manager-rename,
+.file-manager-move {
+  display: grid;
+  gap: 10px;
+}
+
+.file-manager-detail__actions .admin-primary-button,
+.file-manager-detail__actions .admin-secondary-button,
+.file-manager-detail > .admin-danger-button {
+  width: 100%;
+}
+
+.file-manager-move {
+  padding: 14px;
+  border: 1px solid var(--admin-line-soft);
+  border-radius: 8px;
+  background: rgba(16, 40, 74, 0.04);
+}
+
+.file-manager-move__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.file-manager-editor {
+  padding: 18px;
+}
+
+.file-manager-editor h3 {
+  margin: 0;
+  font-size: 28px;
+}
+
+.file-manager-editor textarea {
+  width: 100%;
+  min-height: 420px;
+  padding: 16px;
+  border: 1px solid var(--admin-line-strong);
+  border-radius: 8px;
+  background: #13233d;
+  color: #f8fafc;
+  font: 13px/1.7 Consolas, 'Courier New', monospace;
+  resize: vertical;
+  outline: 0;
+}
+
 @media (max-width: 1200px) {
   .admin-topbar__meta,
   .dashboard-hero__metrics,
@@ -1812,6 +2037,19 @@
   }
 
   .member-editor-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .file-manager-toolbar,
+  .file-manager-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .file-manager-folder-form {
+    grid-template-columns: 1fr;
+  }
+
+  .file-manager-move__actions {
     grid-template-columns: 1fr;
   }
 

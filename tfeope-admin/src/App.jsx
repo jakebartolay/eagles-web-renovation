@@ -20,6 +20,7 @@ import {
   ADMIN_EVENTS_CREATE_ENDPOINT,
   ADMIN_EVENTS_UPDATE_ENDPOINT,
   ADMIN_EVENTS_DELETE_ENDPOINT,
+  ADMIN_FILE_MANAGER_ENDPOINT,
   ADMIN_CLUBS_CREATE_ENDPOINT,
   ADMIN_GOVERNORS_CREATE_ENDPOINT,
   ADMIN_GOVERNORS_DELETE_ENDPOINT,
@@ -88,6 +89,7 @@ import {
   PastLeadersPage,
 } from './admin-app/pages/LeadershipPages'
 import ActivityPage from './admin-app/pages/ActivityPage'
+import FileManagerPage from './admin-app/pages/FileManagerPage'
 import ActionModal from './admin-app/components/ActionModal'
 
 const collectionLoaders = [
@@ -3184,6 +3186,15 @@ function App() {
         )
       case 'activity':
         return <ActivityPage dashboard={dashboard} user={user} query={query} loading={pageLoading} />
+      case 'fileManager':
+        return (
+          <FileManagerPage
+            endpoint={ADMIN_FILE_MANAGER_ENDPOINT}
+            loading={pageLoading}
+            onError={setError}
+            onNotice={setNotice}
+          />
+        )
       case 'dashboard':
       default:
         return (
