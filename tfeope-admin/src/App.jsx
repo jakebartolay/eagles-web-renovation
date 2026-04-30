@@ -252,6 +252,12 @@ function normalizeMemberStatus(value) {
   return String(value || '').trim().toUpperCase() === 'RENEWAL' ? 'RENEWAL' : 'ACTIVE'
 }
 
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
 function normalizeAppointedForAdmin(items = []) {
   if (!Array.isArray(items)) {
     return []
@@ -508,6 +514,8 @@ function App() {
   const [openGroups, setOpenGroups] = useState(initialSidebarGroups(initialPage))
   const [actionModal, setActionModal] = useState(null)
   const [actionBusy, setActionBusy] = useState(false)
+  const [actionProgress, setActionProgress] = useState(null)
+  const [memberIdCheckReady, setMemberIdCheckReady] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState({
     open: false,
     title: '',
@@ -636,7 +644,9 @@ function App() {
   })
   const [memberImportForm, setMemberImportForm] = useState({
     file: null,
+    photos: [],
     duplicates: [],
+    photoReport: null,
     resultMessage: '',
   })
   const isSidebarVisible = isMobileView ? sidebarOpen : !sidebarCollapsed
@@ -646,6 +656,34 @@ function App() {
   const regionCatalogByKey = governorRegionCatalog.byKey
   const regionClubMap = governorRegionCatalog.regionClubMap
   const regions = Object.keys(regionClubMap)
+  const memberIdCheck = (() => {
+    const candidateId = String(memberComposer.id || '').trim().toUpperCase()
+    if (actionModal === 'editMember') {
+      return { status: 'current', message: 'Current member ID.' }
+    }
+
+    if (candidateId === '') {
+      return { status: 'empty', message: 'Leave blank to auto-generate ID.' }
+    }
+
+    if (memberIdCheckReady !== candidateId) {
+      return { status: 'checking', message: 'Checking Eagles ID...' }
+    }
+
+    const match = (collections.members || []).find((member) => (
+      String(member?.id || member?.eagles_id || '').trim().toUpperCase() === candidateId
+    ))
+
+    if (!match) {
+      return { status: 'available', message: 'This Eagles ID is available.' }
+    }
+
+    const name = String(match?.fullName || match?.name || `${match?.firstName || ''} ${match?.lastName || ''}`).trim()
+    return {
+      status: 'duplicate',
+      message: `This Eagles ID already exists${name ? ` for ${name}` : ''}.`,
+    }
+  })()
 
   function resolveRegionEntry(value) {
     const key = normalizeLookupKey(value)
@@ -837,7 +875,9 @@ function App() {
   function resetMemberImportForm() {
     setMemberImportForm({
       file: null,
+      photos: [],
       duplicates: [],
+      photoReport: null,
       resultMessage: '',
     })
   }
@@ -1139,6 +1179,74 @@ function App() {
 
     return () => window.clearTimeout(timeoutId)
   }, [error, notice])
+
+  useEffect(() => {
+    if (actionModal !== 'member') {
+    setMemberIdCheckReady('')
+      return undefined
+    }
+
+    const nextId = String(memberComposer.id || '').trim().toUpperCase()
+
+    if (nextId === '') {
+      setMemberIdCheckReady('')
+      return undefined
+    }
+
+    setMemberIdCheckReady('')
+    const timeoutId = window.setTimeout(() => {
+      setMemberIdCheckReady(nextId)
+    }, 650)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [actionModal, memberComposer.id])
+
+  useEffect(() => {
+    if (!actionProgress?.active) {
+      return undefined
+    }
+
+    const timer = window.setInterval(() => {
+      setActionProgress((current) => {
+        if (!current?.active) return current
+        const nextValue = Math.min(88, current.value + (current.value < 50 ? 4 : 2))
+        return { ...current, value: nextValue }
+      })
+    }, 520)
+
+    return () => window.clearInterval(timer)
+  }, [actionProgress?.active])
+
+  function startActionProgress(label) {
+    setActionProgress({
+      active: true,
+      value: 0,
+      label,
+    })
+
+    return Date.now()
+  }
+
+  async function finishActionProgress(startedAt, label) {
+    const elapsed = Date.now() - startedAt
+    if (elapsed < 2400) {
+      await wait(2400 - elapsed)
+    }
+
+    setActionProgress({
+      active: false,
+      value: 100,
+      label,
+    })
+
+    window.setTimeout(() => {
+      setActionProgress((current) => (current?.active ? current : null))
+    }, 900)
+  }
+
+  function clearActionProgress() {
+    setActionProgress(null)
+  }
 
   async function handleLogin(event) {
     event.preventDefault()
@@ -1631,8 +1739,9 @@ function App() {
     setMemberImportForm((current) => ({
       ...current,
       [field]: value,
-      duplicates: field === 'file' ? [] : current.duplicates,
-      resultMessage: field === 'file' ? '' : current.resultMessage,
+      duplicates: field === 'file' || field === 'photos' ? [] : current.duplicates,
+      photoReport: field === 'file' || field === 'photos' ? null : current.photoReport,
+      resultMessage: field === 'file' || field === 'photos' ? '' : current.resultMessage,
     }))
   }
 
@@ -1753,8 +1862,10 @@ function App() {
       return
     }
 
+    let progressStartedAt = null
     try {
       setActionBusy(true)
+      progressStartedAt = startActionProgress(actionModal === 'editMember' ? 'Updating member...' : 'Creating member...')
       setError('')
       setNotice('')
 
@@ -1764,27 +1875,38 @@ function App() {
 
       if (effectiveRegion === '') {
         setError('Please choose a region first.')
+        clearActionProgress()
         return
       }
 
       if (hasStructuredRegions && !resolveRegionEntry(effectiveRegion)) {
         setError('Selected region is not encoded yet. Please encode region and club first before adding a member.')
+        clearActionProgress()
         return
       }
 
       if (effectiveClub === '') {
         setError('Please choose a club for the selected region.')
+        clearActionProgress()
         return
       }
 
       const allowedClubs = regionClubMap[effectiveRegion] || []
       if (allowedClubs.length === 0) {
         setError('No clubs are encoded for this region yet. Please encode club first before adding a member.')
+        clearActionProgress()
         return
       }
 
       if (!allowedClubs.includes(effectiveClub)) {
         setError('Please choose a club that belongs to the selected region.')
+        clearActionProgress()
+        return
+      }
+
+      if (actionModal !== 'editMember' && memberIdCheck.status === 'duplicate') {
+        setError(memberIdCheck.message || 'Eagles ID already exists.')
+        clearActionProgress()
         return
       }
 
@@ -1812,6 +1934,7 @@ function App() {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData,
       })
+      await finishActionProgress(progressStartedAt, actionModal === 'editMember' ? 'Member updated.' : 'Member created.')
 
       await runAdminRefresh({ silent: true })
       setActivePage('members')
@@ -1820,9 +1943,13 @@ function App() {
       closeActionModal(true)
       resetMemberComposer()
     } catch (createError) {
+      clearActionProgress()
       setError(createError.message || 'Unable to save the member.')
     } finally {
       setActionBusy(false)
+      if (progressStartedAt !== null) {
+        setActionProgress((current) => (current?.active ? null : current))
+      }
     }
   }
 
@@ -2646,13 +2773,18 @@ function App() {
       return
     }
 
+    let progressStartedAt = null
     try {
       setActionBusy(true)
+      progressStartedAt = startActionProgress('Uploading CSV and photos...')
       setError('')
       setNotice('')
 
       const formData = new FormData()
       formData.append('file', memberImportForm.file)
+      ;(memberImportForm.photos || []).forEach((photo) => {
+        formData.append('photos[]', photo)
+      })
 
       const payload = await requestJson(ADMIN_MEMBERS_IMPORT_ENDPOINT, {
         method: 'POST',
@@ -2660,19 +2792,34 @@ function App() {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData,
       })
+      await finishActionProgress(progressStartedAt, 'CSV import processed.')
       const duplicates = Array.isArray(payload?.data?.duplicates) ? payload.data.duplicates : []
+      const photoReport = {
+        attached: Number(payload?.data?.photosAttached || 0) || 0,
+        missing: Array.isArray(payload?.data?.missingPhotos) ? payload.data.missingPhotos : [],
+        unmatched: Array.isArray(payload?.data?.unmatchedPhotos) ? payload.data.unmatchedPhotos : [],
+        invalid: Array.isArray(payload?.data?.invalidPhotos) ? payload.data.invalidPhotos : [],
+        errors: Array.isArray(payload?.data?.photoErrors) ? payload.data.photoErrors : [],
+      }
 
       await runAdminRefresh({ silent: true })
       setOpenGroups((current) => ({ ...current, members: true }))
       setMemberImportForm((current) => ({
         ...current,
         duplicates,
+        photoReport,
         resultMessage: payload?.message || '',
       }))
 
-      if (duplicates.length > 0) {
+      if (
+        duplicates.length > 0
+        || photoReport.missing.length > 0
+        || photoReport.unmatched.length > 0
+        || photoReport.invalid.length > 0
+        || photoReport.errors.length > 0
+      ) {
         setActivePage('members')
-        setNotice(payload?.message || 'Members imported with duplicate IDs skipped.')
+        setNotice(payload?.message || 'Members imported with review items.')
         return
       }
 
@@ -2681,9 +2828,13 @@ function App() {
       closeActionModal(true)
       resetMemberImportForm()
     } catch (importError) {
+      clearActionProgress()
       setError(importError.message || 'Unable to import the CSV file.')
     } finally {
       setActionBusy(false)
+      if (progressStartedAt !== null) {
+        setActionProgress((current) => (current?.active ? null : current))
+      }
     }
   }
 
@@ -2986,6 +3137,9 @@ function App() {
   }
 
   function renderProcessingBackdrop() {
+    const progressValue = Math.round(actionProgress?.value || 0)
+    const progressLabel = actionProgress?.label || 'Processing request...'
+
     return (
       <Backdrop
         open={actionBusy}
@@ -3007,11 +3161,28 @@ function App() {
             border: '1px solid rgba(255, 255, 255, 0.22)',
             background: 'linear-gradient(135deg, rgba(17, 40, 74, 0.95), rgba(10, 22, 43, 0.9))',
             boxShadow: '0 18px 44px rgba(0, 0, 0, 0.35)',
+            width: 'min(460px, calc(100vw - 32px))',
           }}
         >
           <CircularProgress color="inherit" size={42} thickness={4.4} />
-          <strong style={{ fontSize: '15px', letterSpacing: '0.01em' }}>Processing request...</strong>
+          <strong style={{ fontSize: '15px', letterSpacing: '0.01em' }}>{progressLabel}</strong>
           <span style={{ fontSize: '12px', opacity: 0.85 }}>Please wait</span>
+          {actionProgress ? (
+            <div className="admin-processing-progress" role="status" aria-live="polite">
+              <div className="admin-processing-progress__header">
+                <span>Progress</span>
+                <strong>{progressValue}%</strong>
+              </div>
+              <div className="admin-processing-progress__track" aria-hidden="true">
+                <span style={{ width: `${Math.max(0, Math.min(100, progressValue))}%` }}></span>
+              </div>
+              <div className="admin-processing-progress__steps" aria-hidden="true">
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
+              </div>
+            </div>
+          ) : null}
         </Box>
       </Backdrop>
     )
@@ -3589,6 +3760,7 @@ function App() {
         appointedForm={appointedComposer}
         pastLeaderForm={pastLeaderComposer}
         memberForm={memberComposer}
+        memberIdCheck={memberIdCheck}
         regionClubForm={regionClubComposer}
         memberImportForm={memberImportForm}
         userForm={userComposer}

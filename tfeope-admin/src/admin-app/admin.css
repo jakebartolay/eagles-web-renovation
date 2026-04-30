@@ -856,9 +856,20 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.44);
 }
 
+.table-search.searching {
+  border-color: rgba(202, 159, 67, 0.44);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.44),
+    0 0 0 3px rgba(202, 159, 67, 0.12);
+}
+
 .table-search i,
 .table-select span {
   color: var(--admin-muted);
+}
+
+.table-search__spinner {
+  color: var(--admin-navy) !important;
 }
 
 .table-search input {
@@ -1564,6 +1575,51 @@
   gap: 18px;
 }
 
+.admin-processing-progress {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.admin-processing-progress__header,
+.admin-processing-progress__steps {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.admin-processing-progress__header span,
+.admin-processing-progress__steps {
+  color: rgba(245, 248, 255, 0.78);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-processing-progress__header strong {
+  color: #f4cb6b;
+  font-variant-numeric: tabular-nums;
+}
+
+.admin-processing-progress__track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.admin-processing-progress__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c99b32, #f4cb6b);
+  transition: width 0.32s ease;
+}
+
 .member-editor-layout {
   display: grid;
   grid-template-columns: minmax(220px, 0.72fr) minmax(0, 1.28fr);
@@ -1666,7 +1722,21 @@
   background: rgba(155, 106, 22, 0.09);
 }
 
+.csv-photo-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(16, 40, 74, 0.2);
+  border-radius: 8px;
+  background: rgba(16, 40, 74, 0.06);
+}
+
 .csv-duplicate-panel__header {
+  display: grid;
+  gap: 5px;
+}
+
+.csv-photo-panel__header {
   display: grid;
   gap: 5px;
 }
@@ -1682,7 +1752,24 @@
   text-transform: uppercase;
 }
 
+.csv-photo-panel__header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--admin-navy);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .csv-duplicate-panel__header small {
+  color: var(--admin-muted);
+  line-height: 1.5;
+}
+
+.csv-photo-panel__header small,
+.csv-photo-panel > small {
   color: var(--admin-muted);
   line-height: 1.5;
 }
@@ -1741,6 +1828,72 @@
 
 .admin-modal-field--span-2 {
   grid-column: 1 / -1;
+}
+
+.member-id-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.member-id-check.empty,
+.member-id-check.current {
+  color: var(--admin-muted);
+}
+
+.member-id-check.available {
+  color: #276041;
+}
+
+.member-id-check.duplicate {
+  color: var(--admin-danger);
+}
+
+.member-id-input {
+  position: relative;
+}
+
+.member-id-input input {
+  padding-right: 46px;
+}
+
+.member-id-input.available input,
+.member-id-input.current input {
+  border-color: var(--admin-line-strong);
+}
+
+.member-id-input.duplicate input {
+  border-color: var(--admin-danger);
+  box-shadow: 0 0 0 3px rgba(176, 42, 55, 0.12);
+}
+
+.member-id-input__icon {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+}
+
+.member-id-input.available .member-id-input__icon,
+.member-id-input.current .member-id-input__icon {
+  color: #276041;
+}
+
+.member-id-input.duplicate .member-id-input__icon {
+  color: var(--admin-danger);
+}
+
+.member-id-input.checking .member-id-input__icon {
+  color: var(--admin-muted);
 }
 
 .admin-modal-field > span,
@@ -1904,6 +2057,390 @@
   font-weight: 800;
 }
 
+.file-manager-progress {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid rgba(202, 159, 67, 0.28);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(202, 159, 67, 0.12), rgba(16, 40, 74, 0.04)),
+    rgba(255, 255, 255, 0.86);
+}
+
+.file-manager-progress__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.file-manager-progress__header span {
+  color: var(--admin-text);
+  font-weight: 800;
+}
+
+.file-manager-progress__header strong {
+  color: var(--admin-navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.file-manager-progress__track {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(16, 40, 74, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(16, 40, 74, 0.05);
+}
+
+.file-manager-progress__track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #c99b32, #f4cb6b);
+  transition: width 0.32s ease;
+}
+
+.file-manager-optimize-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  isolation: isolate;
+}
+
+.file-manager-optimize-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(4, 10, 20, 0.76);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+.file-manager-optimize-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  display: grid;
+  gap: 16px;
+  padding: clamp(20px, 4vw, 28px);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(245, 248, 252, 0.96)),
+    #fff;
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.52);
+}
+
+.file-manager-optimize-modal__icon {
+  width: 52px;
+  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--admin-navy);
+  background: rgba(16, 40, 74, 0.08);
+  font-size: 22px;
+}
+
+.file-manager-optimize-modal__icon.running,
+.file-manager-optimize-modal__icon.done {
+  color: #276041;
+  background: rgba(39, 96, 65, 0.12);
+}
+
+.file-manager-optimize-modal__icon.error {
+  color: var(--admin-danger);
+  background: var(--admin-danger-soft);
+}
+
+.file-manager-optimize-modal__copy {
+  display: grid;
+  gap: 8px;
+}
+
+.file-manager-optimize-modal__copy .page-kicker,
+.file-manager-optimize-modal__copy h3,
+.file-manager-optimize-modal__copy p {
+  margin: 0;
+}
+
+.file-manager-optimize-modal__copy h3 {
+  color: var(--admin-text);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.file-manager-optimize-modal__copy p:not(.page-kicker) {
+  color: var(--admin-muted);
+  line-height: 1.6;
+}
+
+.file-manager-optimize-modal__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.file-manager-optimize-modal__actions .admin-primary-button:only-child {
+  grid-column: 1 / -1;
+}
+
+.file-manager-delete-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  isolation: isolate;
+}
+
+.file-manager-delete-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(4, 10, 20, 0.76);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+.file-manager-delete-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(540px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border: 1px solid rgba(176, 42, 55, 0.3);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(255, 247, 248, 0.96)),
+    #fff;
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.52);
+}
+
+.file-manager-delete-modal__icon {
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--admin-danger);
+  background: var(--admin-danger-soft);
+  font-size: 24px;
+}
+
+.file-manager-delete-modal__copy {
+  display: grid;
+  gap: 8px;
+}
+
+.file-manager-delete-modal__copy .page-kicker,
+.file-manager-delete-modal__copy h3,
+.file-manager-delete-modal__copy p {
+  margin: 0;
+}
+
+.file-manager-delete-modal__copy .page-kicker {
+  color: var(--admin-danger);
+}
+
+.file-manager-delete-modal__copy h3 {
+  color: var(--admin-text);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.file-manager-delete-modal__copy p:not(.page-kicker) {
+  color: var(--admin-muted);
+  line-height: 1.6;
+}
+
+.file-manager-delete-modal__target {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid rgba(176, 42, 55, 0.16);
+  border-radius: 8px;
+  background: rgba(176, 42, 55, 0.06);
+}
+
+.file-manager-delete-modal__target > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.file-manager-delete-modal__target strong,
+.file-manager-delete-modal__target small {
+  overflow-wrap: anywhere;
+}
+
+.file-manager-delete-modal__target strong {
+  color: var(--admin-text);
+}
+
+.file-manager-delete-modal__target small {
+  color: var(--admin-muted);
+  line-height: 1.45;
+}
+
+.file-manager-delete-modal__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.file-manager-move-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  isolation: isolate;
+}
+
+.file-manager-move-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgba(4, 10, 20, 0.76);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+
+.file-manager-move-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 40px);
+  overflow: auto;
+  display: grid;
+  gap: 16px;
+  padding: clamp(20px, 4vw, 28px);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(245, 248, 252, 0.96)),
+    #fff;
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.52);
+}
+
+.file-manager-move-modal__icon {
+  width: 56px;
+  height: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--admin-navy);
+  background: rgba(16, 40, 74, 0.08);
+  font-size: 24px;
+}
+
+.file-manager-move-modal__icon.running,
+.file-manager-move-modal__icon.done {
+  color: #276041;
+  background: rgba(39, 96, 65, 0.12);
+}
+
+.file-manager-move-modal__icon.error {
+  color: var(--admin-danger);
+  background: var(--admin-danger-soft);
+}
+
+.file-manager-move-modal__copy {
+  display: grid;
+  gap: 8px;
+}
+
+.file-manager-move-modal__copy .page-kicker,
+.file-manager-move-modal__copy h3,
+.file-manager-move-modal__copy p {
+  margin: 0;
+}
+
+.file-manager-move-modal__copy h3 {
+  color: var(--admin-text);
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.file-manager-move-modal__copy p:not(.page-kicker) {
+  color: var(--admin-muted);
+  line-height: 1.6;
+}
+
+.file-manager-move-modal__target,
+.file-manager-move-modal__items {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(16, 40, 74, 0.1);
+  border-radius: 8px;
+  background: rgba(16, 40, 74, 0.04);
+}
+
+.file-manager-move-modal__target span,
+.file-manager-move-modal__items span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--admin-muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.file-manager-move-modal__target strong {
+  color: var(--admin-navy);
+  overflow-wrap: anywhere;
+}
+
+.file-manager-move-modal__items ul {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file-manager-move-modal__items li {
+  color: var(--admin-text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.file-manager-move-modal__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.file-manager-move-modal__actions .admin-primary-button:only-child {
+  grid-column: 1 / -1;
+}
+
 .file-manager-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(280px, 0.38fr);
@@ -1947,6 +2484,30 @@
   background: rgba(255, 255, 255, 0.94);
 }
 
+.file-manager-row.active,
+.file-manager-row.checked {
+  position: relative;
+  border-color: rgba(202, 159, 67, 0.82);
+  background:
+    linear-gradient(90deg, rgba(244, 203, 107, 0.24), rgba(255, 255, 255, 0.96) 42%),
+    rgba(255, 255, 255, 0.96);
+  box-shadow:
+    0 0 0 2px rgba(244, 203, 107, 0.28),
+    0 14px 28px rgba(16, 40, 74, 0.1);
+}
+
+.file-manager-row.active::before,
+.file-manager-row.checked::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 5px;
+  border-radius: 0 999px 999px 0;
+  background: linear-gradient(180deg, #f4cb6b, #c99b32);
+}
+
 .file-manager-row__check {
   width: 28px;
   height: 28px;
@@ -1960,9 +2521,10 @@
 }
 
 .file-manager-row.checked .file-manager-row__check {
-  color: #231b0b;
-  border-color: rgba(202, 159, 67, 0.48);
+  color: #171204;
+  border-color: rgba(154, 108, 18, 0.78);
   background: linear-gradient(135deg, #f4cb6b, #d4a340);
+  box-shadow: 0 0 0 3px rgba(244, 203, 107, 0.22);
 }
 
 .file-manager-row__icon {
@@ -1988,6 +2550,13 @@
 .file-manager-row.has-preview .file-manager-row__icon {
   background: rgba(255, 255, 255, 0.86);
   box-shadow: inset 0 0 0 1px rgba(16, 40, 74, 0.08);
+}
+
+.file-manager-row.active .file-manager-row__icon,
+.file-manager-row.checked .file-manager-row__icon {
+  box-shadow:
+    inset 0 0 0 2px rgba(202, 159, 67, 0.72),
+    0 8px 18px rgba(202, 159, 67, 0.2);
 }
 
 .file-manager-row__main,
@@ -2055,6 +2624,10 @@
 .file-manager-detail__actions .admin-secondary-button,
 .file-manager-detail > .admin-danger-button {
   width: 100%;
+}
+
+.file-manager-delete-trigger {
+  margin-top: 2px;
 }
 
 .file-manager-move {
@@ -2378,6 +2951,12 @@
 
   .table-pagination__button {
     flex: 1 1 140px;
+  }
+
+  .file-manager-delete-modal__actions,
+  .file-manager-move-modal__actions,
+  .file-manager-optimize-modal__actions {
+    grid-template-columns: 1fr;
   }
 
   .memorandum-table__actions,

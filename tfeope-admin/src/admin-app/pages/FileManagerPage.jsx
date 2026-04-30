@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Skeleton from '@mui/material/Skeleton'
 import { requestJson } from '../utils'
 
@@ -44,6 +45,12 @@ function imagePreviewUrl(item) {
   return item?.publicUrl || item?.downloadUrl || ''
 }
 
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms)
+  })
+}
+
 function FileManagerLoading() {
   return (
     <section className="content-section-card file-manager-page">
@@ -81,6 +88,12 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
   const [destinationPath, setDestinationPath] = useState('')
   const [selectedPaths, setSelectedPaths] = useState([])
   const [localQuery, setLocalQuery] = useState('')
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
+  const [optimizeProgress, setOptimizeProgress] = useState(null)
+  const [optimizeModalOpen, setOptimizeModalOpen] = useState(false)
+  const [optimizeStatus, setOptimizeStatus] = useState('idle')
+  const [moveConfirmOpen, setMoveConfirmOpen] = useState(false)
+  const [moveStatus, setMoveStatus] = useState('idle')
 
   const selectedRoot = roots.find((root) => root.id === rootId) || roots[0] || null
   const breadcrumbs = useMemo(() => {
@@ -99,6 +112,10 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
     if (!localQuery) return true
     return JSON.stringify(item).toLowerCase().includes(localQuery.toLowerCase())
   })
+  const selectedImageCount = selectedPaths.filter((selectedPath) => {
+    const item = items.find((candidate) => candidate.path === selectedPath)
+    return isImageFile(item)
+  }).length
 
   async function loadRoots() {
     const payload = await requestJson(`${endpoint}?action=roots`, {
@@ -133,6 +150,14 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
       setEditor(null)
       setRenameName('')
       setSelectedPaths([])
+      setDeleteConfirmOpen(false)
+      setMoveConfirmOpen(false)
+      setMoveStatus('idle')
+      if (optimizeStatus !== 'running') {
+        setOptimizeModalOpen(false)
+        setOptimizeProgress(null)
+        setOptimizeStatus('idle')
+      }
     } catch (error) {
       onError?.(error.message || 'Unable to load files.')
     } finally {
@@ -160,6 +185,20 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
     // The first load should run once; later folder changes are user-driven.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (!optimizeProgress?.active) return undefined
+
+    const timer = window.setInterval(() => {
+      setOptimizeProgress((current) => {
+        if (!current?.active) return current
+        const nextValue = Math.min(88, current.value + (current.value < 50 ? 4 : 2))
+        return { ...current, value: nextValue }
+      })
+    }, 520)
+
+    return () => window.clearInterval(timer)
+  }, [optimizeProgress?.active])
 
   async function postAction(action, body = {}) {
     const payload = await requestJson(endpoint, {
@@ -307,9 +346,6 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
   async function deleteSelected() {
     if (!selected) return
 
-    const confirmed = window.confirm(`Delete "${selected.name}"? This cannot be undone.`)
-    if (!confirmed) return
-
     setBusy(true)
     try {
       await requestJson(endpoint, {
@@ -326,6 +362,7 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
         }),
       })
       onNotice?.('Item deleted.')
+      setDeleteConfirmOpen(false)
       await loadDirectory(rootId, path)
     } catch (error) {
       onError?.(error.message || 'Unable to delete item.')
@@ -339,6 +376,9 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
     setRenameName(item?.name || '')
     setDestinationRootId(rootId)
     setDestinationPath(path)
+    setDeleteConfirmOpen(false)
+    setMoveConfirmOpen(false)
+    setMoveStatus('idle')
     if (item?.type !== 'file') {
       setEditor(null)
     }
@@ -360,19 +400,36 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
     }
   }
 
-  async function moveSelected(event) {
-    event.preventDefault()
-    const pathsToMove = selectedPaths.length > 0 ? selectedPaths : selected ? [selected.path] : []
-    if (!pathsToMove.length || !destinationRootId) return
+  function pathsToMove() {
+    return selectedPaths.length > 0 ? selectedPaths : selected ? [selected.path] : []
+  }
 
+  function moveTargetLabel() {
     const targetLabel = roots.find((root) => root.id === destinationRootId)?.label || 'selected root'
-    const moveLabel = pathsToMove.length === 1 && selected
-      ? `"${selected.name}"`
-      : `${pathsToMove.length} selected item(s)`
-    const confirmed = window.confirm(`Move ${moveLabel} to ${targetLabel}${destinationPath ? `/${destinationPath}` : ''}?`)
-    if (!confirmed) return
+    return `${targetLabel}${destinationPath ? `/${destinationPath}` : ''}`
+  }
+
+  function openMoveConfirm(event) {
+    event.preventDefault()
+    if (!pathsToMove().length || !destinationRootId) return
+
+    setMoveStatus('confirm')
+    setMoveConfirmOpen(true)
+  }
+
+  function closeMoveConfirm() {
+    if (moveStatus === 'running') return
+
+    setMoveConfirmOpen(false)
+    setMoveStatus('idle')
+  }
+
+  async function moveSelected() {
+    const nextPathsToMove = pathsToMove()
+    if (!nextPathsToMove.length || !destinationRootId) return
 
     setBusy(true)
+    setMoveStatus('running')
     try {
       await requestJson(endpoint, {
         method: 'POST',
@@ -384,17 +441,103 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
         body: JSON.stringify({
           action: 'move',
           root: rootId,
-          path: pathsToMove[0],
-          paths: pathsToMove,
+          path: nextPathsToMove[0],
+          paths: nextPathsToMove,
           destinationRoot: destinationRootId,
           destinationPath,
         }),
       })
       onNotice?.('Item moved.')
+      setMoveStatus('done')
       setSelectedPaths([])
       await loadDirectory(rootId, path)
     } catch (error) {
+      setMoveStatus('error')
       onError?.(error.message || 'Unable to move item.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function openOptimizeModal() {
+    const imagePaths = selectedPaths.filter((selectedPath) => {
+      const item = items.find((candidate) => candidate.path === selectedPath)
+      return isImageFile(item)
+    })
+
+    if (!imagePaths.length) return
+    setOptimizeStatus('confirm')
+    setOptimizeProgress({
+      active: false,
+      value: 0,
+      total: imagePaths.length,
+      label: `Ready to optimize ${imagePaths.length} image(s).`,
+    })
+    setOptimizeModalOpen(true)
+  }
+
+  function closeOptimizeModal() {
+    if (optimizeStatus === 'running') return
+
+    setOptimizeModalOpen(false)
+    setOptimizeProgress(null)
+    setOptimizeStatus('idle')
+  }
+
+  async function optimizeSelectedImages() {
+    const imagePaths = selectedPaths.filter((selectedPath) => {
+      const item = items.find((candidate) => candidate.path === selectedPath)
+      return isImageFile(item)
+    })
+
+    if (!imagePaths.length) return
+
+    setBusy(true)
+    setOptimizeStatus('running')
+    const startedAt = Date.now()
+    setOptimizeProgress({
+      active: true,
+      value: 0,
+      total: imagePaths.length,
+      label: `Optimizing ${imagePaths.length} image(s)...`,
+    })
+    try {
+      const payload = await requestJson(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: JSON.stringify({
+          action: 'optimize',
+          root: rootId,
+          path,
+          paths: imagePaths,
+        }),
+      })
+      const elapsed = Date.now() - startedAt
+      if (elapsed < 2600) {
+        await wait(2600 - elapsed)
+      }
+
+      setOptimizeProgress((current) => ({
+        ...(current || {}),
+        active: false,
+        value: 100,
+        label: payload?.message || 'Images optimized.',
+      }))
+      setOptimizeStatus('done')
+      onNotice?.(payload?.message || 'Images optimized.')
+      await loadDirectory(rootId, path)
+    } catch (error) {
+      setOptimizeStatus('error')
+      setOptimizeProgress((current) => ({
+        ...(current || {}),
+        active: false,
+        label: error.message || 'Unable to optimize images.',
+      }))
+      onError?.(error.message || 'Unable to optimize images.')
     } finally {
       setBusy(false)
     }
@@ -403,6 +546,8 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
   if (loading && !roots.length) {
     return <FileManagerLoading />
   }
+
+  const portalTarget = typeof document !== 'undefined' ? document.body : null
 
   return (
     <section className="content-section-card file-manager-page">
@@ -493,7 +638,80 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
         <button type="button" className="admin-secondary-button" onClick={() => setSelectedPaths([])} disabled={busy || selectedPaths.length === 0}>
           Clear
         </button>
+        <button type="button" className="admin-secondary-button" onClick={openOptimizeModal} disabled={busy || selectedImageCount === 0}>
+          <i className="fas fa-compress" aria-hidden="true"></i>
+          Optimize Images{selectedImageCount > 0 ? ` (${selectedImageCount})` : ''}
+        </button>
       </div>
+
+      {optimizeModalOpen && portalTarget ? createPortal((
+        <div className="file-manager-optimize-modal" role="dialog" aria-modal="true" aria-labelledby="file-manager-optimize-title">
+          <button type="button" className="file-manager-optimize-modal__backdrop" onClick={closeOptimizeModal} aria-label="Close optimize dialog"></button>
+          <div className="file-manager-optimize-modal__dialog">
+            <div className={`file-manager-optimize-modal__icon ${optimizeStatus}`}>
+              <i
+                className={`fas ${
+                  optimizeStatus === 'running'
+                    ? 'fa-circle-notch fa-spin'
+                    : optimizeStatus === 'done'
+                      ? 'fa-circle-check'
+                      : optimizeStatus === 'error'
+                        ? 'fa-circle-exclamation'
+                        : 'fa-compress'
+                }`}
+                aria-hidden="true"
+              ></i>
+            </div>
+            <div className="file-manager-optimize-modal__copy">
+              <p className="page-kicker">{optimizeStatus === 'confirm' ? 'Confirm Optimize' : 'Image Optimizer'}</p>
+              <h3 id="file-manager-optimize-title">
+                {optimizeStatus === 'confirm'
+                  ? 'Optimize selected images?'
+                  : optimizeStatus === 'running'
+                    ? 'Optimizing images...'
+                    : optimizeStatus === 'done'
+                      ? 'Optimization complete'
+                      : 'Optimization failed'}
+              </h3>
+              <p>
+                {optimizeStatus === 'confirm'
+                  ? `This will reduce file sizes for ${selectedImageCount} selected image(s) without changing filenames.`
+                  : optimizeProgress?.label || 'Please wait while the selected images are processed.'}
+              </p>
+            </div>
+
+            {optimizeStatus !== 'confirm' ? (
+              <div className="file-manager-progress" role="status" aria-live="polite">
+                <div className="file-manager-progress__header">
+                  <span>{optimizeProgress?.label || 'Optimizing images...'}</span>
+                  <strong>{Math.round(optimizeProgress?.value || 0)}%</strong>
+                </div>
+                <div className="file-manager-progress__track" aria-hidden="true">
+                  <span style={{ width: `${Math.max(0, Math.min(100, optimizeProgress?.value || 0))}%` }}></span>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="file-manager-optimize-modal__actions">
+              {optimizeStatus === 'confirm' ? (
+                <>
+                  <button type="button" className="admin-secondary-button" onClick={closeOptimizeModal}>
+                    Cancel
+                  </button>
+                  <button type="button" className="admin-primary-button" onClick={optimizeSelectedImages}>
+                    <i className="fas fa-compress" aria-hidden="true"></i>
+                    Optimize Now
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="admin-primary-button" onClick={closeOptimizeModal} disabled={optimizeStatus === 'running'}>
+                  {optimizeStatus === 'running' ? 'Please wait...' : 'Done'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ), portalTarget) : null}
 
       <div className="file-manager-layout">
         <div className="file-manager-list">
@@ -617,7 +835,7 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
                 </button>
               </form>
 
-              <form className="file-manager-move" onSubmit={moveSelected}>
+              <form className="file-manager-move" onSubmit={openMoveConfirm}>
                 <label className="admin-modal-field">
                   <span>Move To Root</span>
                   <select
@@ -659,10 +877,11 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
                 </div>
               </form>
 
-              <button type="button" className="admin-danger-button" onClick={deleteSelected} disabled={busy}>
+              <button type="button" className="admin-danger-button file-manager-delete-trigger" onClick={() => setDeleteConfirmOpen(true)} disabled={busy}>
                 <i className="fas fa-trash-can" aria-hidden="true"></i>
                 Delete
               </button>
+
             </>
           ) : (
             <div className="content-empty-state">
@@ -672,6 +891,129 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
           )}
         </aside>
       </div>
+
+      {deleteConfirmOpen && selected && portalTarget ? createPortal((
+        <div className="file-manager-delete-modal" role="dialog" aria-modal="true" aria-labelledby="file-manager-delete-title">
+          <button type="button" className="file-manager-delete-modal__backdrop" onClick={() => setDeleteConfirmOpen(false)} aria-label="Close delete confirmation"></button>
+          <div className="file-manager-delete-modal__dialog">
+            <div className="file-manager-delete-modal__icon">
+              <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
+            </div>
+
+            <div className="file-manager-delete-modal__copy">
+              <p className="page-kicker">Permanent Delete</p>
+              <h3 id="file-manager-delete-title">Delete this {selected.type === 'folder' ? 'folder' : 'file'}?</h3>
+              <p>This action cannot be undone. Make sure this is not being used by the website before deleting.</p>
+            </div>
+
+            <div className="file-manager-delete-modal__target">
+              <span className="file-manager-row__icon">
+                {imagePreviewUrl(selected) ? (
+                  <img src={imagePreviewUrl(selected)} alt="" />
+                ) : (
+                  <i className={`fas ${itemIcon(selected)}`} aria-hidden="true"></i>
+                )}
+              </span>
+              <div>
+                <strong>{selected.name}</strong>
+                <small>{selected.path || selected.name}</small>
+              </div>
+            </div>
+
+            <div className="file-manager-delete-modal__actions">
+              <button type="button" className="admin-secondary-button" onClick={() => setDeleteConfirmOpen(false)} disabled={busy}>
+                Cancel
+              </button>
+              <button type="button" className="admin-danger-button" onClick={deleteSelected} disabled={busy}>
+                <i className={`fas ${busy ? 'fa-circle-notch fa-spin' : 'fa-trash-can'}`} aria-hidden="true"></i>
+                Delete Now
+              </button>
+            </div>
+          </div>
+        </div>
+      ), portalTarget) : null}
+
+      {moveConfirmOpen && portalTarget ? createPortal((
+        <div className="file-manager-move-modal" role="dialog" aria-modal="true" aria-labelledby="file-manager-move-title">
+          <button type="button" className="file-manager-move-modal__backdrop" onClick={closeMoveConfirm} aria-label="Close move confirmation"></button>
+          <div className="file-manager-move-modal__dialog">
+            <div className={`file-manager-move-modal__icon ${moveStatus}`}>
+              <i
+                className={`fas ${
+                  moveStatus === 'running'
+                    ? 'fa-circle-notch fa-spin'
+                    : moveStatus === 'done'
+                      ? 'fa-circle-check'
+                      : moveStatus === 'error'
+                        ? 'fa-circle-exclamation'
+                        : 'fa-share-from-square'
+                }`}
+                aria-hidden="true"
+              ></i>
+            </div>
+
+            <div className="file-manager-move-modal__copy">
+              <p className="page-kicker">{moveStatus === 'confirm' ? 'Confirm Move' : 'File Manager'}</p>
+              <h3 id="file-manager-move-title">
+                {moveStatus === 'confirm'
+                  ? 'Move selected item(s)?'
+                  : moveStatus === 'running'
+                    ? 'Moving item(s)...'
+                    : moveStatus === 'done'
+                      ? 'Move complete'
+                      : 'Move failed'}
+              </h3>
+              <p>
+                {moveStatus === 'confirm'
+                  ? `${pathsToMove().length} item(s) will be moved to ${moveTargetLabel()}.`
+                  : moveStatus === 'running'
+                    ? 'Please wait while the selected item(s) are moved.'
+                    : moveStatus === 'done'
+                      ? 'Selected item(s) were moved successfully.'
+                      : 'The selected item(s) could not be moved.'}
+              </p>
+            </div>
+
+            <div className="file-manager-move-modal__target">
+              <span>
+                <i className="fas fa-folder-tree" aria-hidden="true"></i>
+                Destination
+              </span>
+              <strong>{moveTargetLabel()}</strong>
+            </div>
+
+            {pathsToMove().length > 0 ? (
+              <div className="file-manager-move-modal__items">
+                <span>Selected item(s)</span>
+                <ul>
+                  {pathsToMove().slice(0, 4).map((itemPath) => (
+                    <li key={itemPath}>{itemPath}</li>
+                  ))}
+                  {pathsToMove().length > 4 ? <li>+{pathsToMove().length - 4} more</li> : null}
+                </ul>
+              </div>
+            ) : null}
+
+            <div className="file-manager-move-modal__actions">
+              {moveStatus === 'confirm' ? (
+                <>
+                  <button type="button" className="admin-secondary-button" onClick={closeMoveConfirm}>
+                    Cancel
+                  </button>
+                  <button type="button" className="admin-primary-button" onClick={moveSelected}>
+                    <i className="fas fa-share-from-square" aria-hidden="true"></i>
+                    Move Now
+                  </button>
+                </>
+              ) : (
+                <button type="button" className="admin-primary-button" onClick={closeMoveConfirm} disabled={moveStatus === 'running'}>
+                  {moveStatus === 'running' ? 'Please wait...' : 'Done'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ), portalTarget) : null}
 
       {editor ? (
         <div className="file-manager-editor">

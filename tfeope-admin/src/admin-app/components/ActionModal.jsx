@@ -283,7 +283,7 @@ function CsvTemplateNote({ file }) {
         <span className="csv-template-preview__label">Header preview</span>
         <code>ID,First Name,Last Name,Position,Club,Region,Status</code>
         <small>
-          Existing member IDs will be updated. New IDs will be created as new member records.
+          Duplicate member IDs are skipped. Optional photos must use the member ID as filename.
         </small>
         {file ? <strong>Selected file: {file.name}</strong> : null}
       </div>
@@ -330,6 +330,82 @@ function CsvDuplicateTable({ duplicates = [], message = '' }) {
           </tbody>
         </table>
       </div>
+    </div>
+  )
+}
+
+function CsvPhotoReport({ report = null }) {
+  if (!report) {
+    return null
+  }
+
+  const missing = Array.isArray(report.missing) ? report.missing : []
+  const unmatched = Array.isArray(report.unmatched) ? report.unmatched : []
+  const invalid = Array.isArray(report.invalid) ? report.invalid : []
+  const errors = Array.isArray(report.errors) ? report.errors : []
+  const reviewItems = [
+    ...missing.map((item) => ({
+      type: 'Missing',
+      id: item.id || '-',
+      file: '-',
+      reason: 'No matching photo uploaded.',
+    })),
+    ...unmatched.map((item) => ({
+      type: 'Unmatched',
+      id: item.expectedId || '-',
+      file: item.file || '-',
+      reason: item.reason || 'No matching member ID.',
+    })),
+    ...invalid.map((item) => ({
+      type: 'Invalid',
+      id: '-',
+      file: item.file || '-',
+      reason: item.reason || 'Invalid photo.',
+    })),
+    ...errors.map((item) => ({
+      type: 'Error',
+      id: item.id || '-',
+      file: item.file || '-',
+      reason: item.reason || 'Unable to attach photo.',
+    })),
+  ]
+
+  return (
+    <div className="csv-photo-panel" role="status">
+      <div className="csv-photo-panel__header">
+        <span>
+          <i className="fas fa-images" aria-hidden="true"></i>
+          Photo matching report
+        </span>
+        <small>{report.attached || 0} photo(s) attached. Import continues even when photos need review.</small>
+      </div>
+
+      {reviewItems.length > 0 ? (
+        <div className="csv-duplicate-table-wrap">
+          <table className="csv-duplicate-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Eagles ID</th>
+                <th>File</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reviewItems.map((item, index) => (
+                <tr key={`${item.type}-${item.id}-${item.file}-${index}`}>
+                  <td>{item.type}</td>
+                  <td>{item.id}</td>
+                  <td>{item.file}</td>
+                  <td>{item.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <small>All uploaded photos matched successfully.</small>
+      )}
     </div>
   )
 }
@@ -394,6 +470,7 @@ export default function ActionModal({
   appointedForm,
   pastLeaderForm,
   memberForm,
+  memberIdCheck,
   regionClubForm,
   memberImportForm,
   userForm,
@@ -566,7 +643,11 @@ export default function ActionModal({
               <button type="button" className="admin-secondary-button" onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className="admin-primary-button" disabled={submitting}>
+              <button
+                type="submit"
+                className="admin-primary-button"
+                disabled={submitting || (!isEditingMember && memberIdCheck?.status === 'duplicate')}
+              >
                 <i
                   className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-floppy-disk'}`}
                   aria-hidden="true"
@@ -1189,13 +1270,29 @@ export default function ActionModal({
                   </div>
                 </Field> */}
                 <Field label="Eagles ID" helper={isEditingMember ? 'Member ID cannot be changed while editing.' : 'Optional. Leave blank to auto-generate ID.'}>
-                  <input
-                    type="text"
-                    placeholder="Eagles ID"
-                    value={memberForm?.id || ''}
-                    onChange={(event) => onMemberFieldChange('id', event.target.value)}
-                    readOnly={isEditingMember}
-                  />
+                  <div className={`member-id-input ${memberIdCheck?.status || 'empty'}`}>
+                    <input
+                      type="text"
+                      placeholder="Eagles ID"
+                      value={memberForm?.id || ''}
+                      onChange={(event) => onMemberFieldChange('id', event.target.value)}
+                      readOnly={isEditingMember}
+                      aria-invalid={memberIdCheck?.status === 'duplicate'}
+                    />
+                    {memberIdCheck?.status && memberIdCheck.status !== 'empty' ? (
+                      <span className="member-id-input__icon" aria-hidden="true">
+                        <i
+                          className={`fas ${
+                            memberIdCheck.status === 'checking'
+                              ? 'fa-circle-notch fa-spin'
+                              : memberIdCheck.status === 'duplicate'
+                                ? 'fa-circle-xmark'
+                                : 'fa-circle-check'
+                          }`}
+                        ></i>
+                      </span>
+                    ) : null}
+                  </div>
                 </Field>
 
                 <Field label="Status">
@@ -1309,6 +1406,7 @@ export default function ActionModal({
               duplicates={memberImportForm?.duplicates || []}
               message={memberImportForm?.resultMessage || ''}
             />
+            <CsvPhotoReport report={memberImportForm?.photoReport || null} />
 
             <div className="admin-modal-grid">
               <Field
@@ -1322,6 +1420,21 @@ export default function ActionModal({
                   onChange={(event) => onMemberImportFieldChange('file', event.target.files?.[0] || null)}
                   required
                 />
+              </Field>
+              <Field
+                label="Member photos"
+                fullWidth
+                helper="Optional. Select many photos. Filename must match Eagles ID, for example EAG_001.png."
+              >
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.jfif,image/*"
+                  multiple
+                  onChange={(event) => onMemberImportFieldChange('photos', Array.from(event.target.files || []))}
+                />
+                {memberImportForm?.photos?.length ? (
+                  <small>{memberImportForm.photos.length} photo file(s) selected.</small>
+                ) : null}
               </Field>
             </div>
 

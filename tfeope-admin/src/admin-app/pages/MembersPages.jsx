@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Skeleton from '@mui/material/Skeleton'
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
@@ -146,9 +146,9 @@ function EntityAvatar({ src, label }) {
   return <span className="entity-avatar">{initialsFromName(label)}</span>
 }
 
-function TableSearch({ value, onChange, placeholder }) {
+function TableSearch({ value, onChange, placeholder, searching = false }) {
   return (
-    <label className="table-search">
+    <label className={`table-search ${searching ? 'searching' : ''}`}>
       <i className="fas fa-magnifying-glass" aria-hidden="true"></i>
       <input
         type="search"
@@ -156,6 +156,9 @@ function TableSearch({ value, onChange, placeholder }) {
         onChange={onChange}
         placeholder={placeholder}
       />
+      {searching ? (
+        <i className="fas fa-circle-notch fa-spin table-search__spinner" aria-hidden="true"></i>
+      ) : null}
     </label>
   )
 }
@@ -194,12 +197,13 @@ export function MembersPage({
   onDeleteMember,
 }) {
   const [tableSearch, setTableSearch] = useState('')
+  const [settledTableSearch, setSettledTableSearch] = useState('')
+  const [tableSearchLoading, setTableSearchLoading] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
   const [clubFilter, setClubFilter] = useState('all')
   const [regionFilter, setRegionFilter] = useState('all')
   const [rowsPerPage, setRowsPerPage] = useState(PAGE_SIZE_OPTIONS[0])
   const [currentPage, setCurrentPage] = useState(1)
-  const deferredTableSearch = useDeferredValue(tableSearch)
 
   const statusOptions = Array.from(new Set(
     members
@@ -228,7 +232,7 @@ export function MembersPage({
 
   const filteredItems = members.filter((item) => {
     if (!matchesQuery(item, query)) return false
-    if (!matchesQuery(item, deferredTableSearch)) return false
+    if (!matchesQuery(item, settledTableSearch)) return false
 
     const status = resolveMemberStatus(item)
     const club = resolveMemberField(item, 'club')
@@ -253,7 +257,24 @@ export function MembersPage({
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [deferredTableSearch, statusFilter, clubFilter, regionFilter, query, rowsPerPage])
+  }, [settledTableSearch, statusFilter, clubFilter, regionFilter, query, rowsPerPage])
+
+  useEffect(() => {
+    const nextSearch = tableSearch.trim()
+
+    if (nextSearch === settledTableSearch) {
+      setTableSearchLoading(false)
+      return undefined
+    }
+
+    setTableSearchLoading(nextSearch.length > 0)
+    const timeoutId = window.setTimeout(() => {
+      setSettledTableSearch(nextSearch)
+      setTableSearchLoading(false)
+    }, nextSearch.length > 0 ? 650 : 180)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [tableSearch, settledTableSearch])
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -312,6 +333,8 @@ export function MembersPage({
 
   function clearTableFilters() {
     setTableSearch('')
+    setSettledTableSearch('')
+    setTableSearchLoading(false)
     setStatusFilter('all')
     setClubFilter('all')
     setRegionFilter('all')
@@ -361,6 +384,7 @@ export function MembersPage({
           value={tableSearch}
           onChange={(event) => setTableSearch(event.target.value)}
           placeholder="Search inside members table"
+          searching={tableSearchLoading}
         />
 
         <div className="members-toolbar__line">
@@ -428,7 +452,6 @@ export function MembersPage({
                 <th>Club</th>
                 <th>Region</th>
                 <th>Status</th>
-                <th>Added</th>
                 {isSuperAdmin ? <th>Actions</th> : null}
               </tr>
             </thead>
@@ -440,7 +463,6 @@ export function MembersPage({
                 const club = resolveMemberField(item, 'club') || 'Club not set'
                 const region = resolveMemberField(item, 'region') || 'Region not set'
                 const status = resolveMemberStatus(item)
-                const dateAdded = formatDate(item?.dateAdded || item?.eagles_dateAdded)
 
                 return (
                   <tr key={memberId || `${name}-${index}`}>
@@ -459,7 +481,6 @@ export function MembersPage({
                     <td data-label="Status">
                       <span className={`member-status-badge ${memberStatusTone(status)}`}>{status}</span>
                     </td>
-                    <td data-label="Added">{dateAdded}</td>
                     {isSuperAdmin ? (
                       <td data-label="Actions">
                         <div className="members-table__actions">

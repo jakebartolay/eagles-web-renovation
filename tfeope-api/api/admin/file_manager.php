@@ -17,6 +17,19 @@ function file_manager_json_error(string $message, int $status = 400): never
     ], $status);
 }
 
+function file_manager_format_bytes(int $bytes): string
+{
+    if ($bytes <= 0) {
+        return '0 B';
+    }
+
+    $units = ['B', 'KB', 'MB', 'GB'];
+    $index = min((int) floor(log($bytes, 1024)), count($units) - 1);
+    $value = $bytes / (1024 ** $index);
+
+    return number_format($value, $index === 0 ? 0 : 1) . ' ' . $units[$index];
+}
+
 function file_manager_is_super_admin(PDO $db): array
 {
     $admin = api_require_admin($db);
@@ -270,6 +283,143 @@ function file_manager_is_editable(string $path): bool
         'yml',
         'yaml',
     ], true);
+}
+
+function file_manager_is_image_file(string $path): bool
+{
+    return in_array(file_manager_extension($path), ['jpg', 'jpeg', 'png', 'webp', 'bmp'], true)
+        && function_exists('imagecreatefromstring');
+}
+
+function file_manager_image_options(string $path): array
+{
+    $normalizedPath = strtolower(file_manager_slash_path($path));
+    if (str_contains($normalizedPath, '/members/')) {
+        return ['max_width' => 900, 'max_height' => 900, 'quality' => 78];
+    }
+
+    return ['max_width' => 1400, 'max_height' => 1400, 'quality' => 80];
+}
+
+function file_manager_optimize_image_file(string $path): array
+{
+    if (!is_file($path) || !is_writable($path) || !file_manager_is_image_file($path)) {
+        throw new RuntimeException('Selected file is not an optimizable image.');
+    }
+
+    $beforeSize = (int) (filesize($path) ?: 0);
+    $imageData = file_get_contents($path);
+    if ($imageData === false) {
+        throw new RuntimeException('Unable to read image.');
+    }
+
+    $sourceImage = @imagecreatefromstring($imageData);
+    if ($sourceImage === false) {
+        throw new RuntimeException('Unable to decode image.');
+    }
+
+    $sourceWidth = imagesx($sourceImage);
+    $sourceHeight = imagesy($sourceImage);
+    if ($sourceWidth <= 0 || $sourceHeight <= 0) {
+        imagedestroy($sourceImage);
+        throw new RuntimeException('Invalid image dimensions.');
+    }
+
+    $options = file_manager_image_options($path);
+    $maxWidth = max(1, (int) ($options['max_width'] ?? 1400));
+    $maxHeight = max(1, (int) ($options['max_height'] ?? 1400));
+    $quality = max(1, min(100, (int) ($options['quality'] ?? 80)));
+    $scale = min(1, $maxWidth / $sourceWidth, $maxHeight / $sourceHeight);
+    $targetWidth = max(1, (int) round($sourceWidth * $scale));
+    $targetHeight = max(1, (int) round($sourceHeight * $scale));
+
+    $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+    if ($canvas === false) {
+        imagedestroy($sourceImage);
+        throw new RuntimeException('Unable to prepare image canvas.');
+    }
+
+    imagealphablending($canvas, false);
+    imagesavealpha($canvas, true);
+    $transparent = imagecolorallocatealpha($canvas, 255, 255, 255, 127);
+    imagefill($canvas, 0, 0, $transparent);
+
+    if (!imagecopyresampled(
+        $canvas,
+        $sourceImage,
+        0,
+        0,
+        0,
+        0,
+        $targetWidth,
+        $targetHeight,
+        $sourceWidth,
+        $sourceHeight
+    )) {
+        imagedestroy($sourceImage);
+        imagedestroy($canvas);
+        throw new RuntimeException('Unable to resize image.');
+    }
+
+    imagedestroy($sourceImage);
+
+    $extension = file_manager_extension($path);
+    $temporaryPath = $path . '.optimize-' . str_replace('.', '', uniqid('', true)) . '.tmp';
+    $saved = false;
+
+    if (in_array($extension, ['jpg', 'jpeg'], true)) {
+        imageinterlace($canvas, true);
+        $saved = imagejpeg($canvas, $temporaryPath, $quality);
+    } elseif ($extension === 'webp' && function_exists('imagewebp')) {
+        $saved = imagewebp($canvas, $temporaryPath, $quality);
+    } elseif ($extension === 'png') {
+        $saved = imagepng($canvas, $temporaryPath, 9);
+    } elseif ($extension === 'bmp' && function_exists('imagebmp')) {
+        $saved = imagebmp($canvas, $temporaryPath);
+    }
+
+    imagedestroy($canvas);
+
+    if (!$saved || !is_file($temporaryPath)) {
+        @unlink($temporaryPath);
+        throw new RuntimeException('Unable to save optimized image.');
+    }
+
+    $afterSize = (int) (filesize($temporaryPath) ?: 0);
+    if ($afterSize <= 0 || ($beforeSize > 0 && $afterSize >= $beforeSize)) {
+        @unlink($temporaryPath);
+        return [
+            'optimized' => false,
+            'beforeSize' => $beforeSize,
+            'afterSize' => $beforeSize,
+            'savedBytes' => 0,
+            'width' => $sourceWidth,
+            'height' => $sourceHeight,
+        ];
+    }
+
+    $backupPath = $path . '.backup-' . str_replace('.', '', uniqid('', true)) . '.tmp';
+    if (!rename($path, $backupPath)) {
+        @unlink($temporaryPath);
+        throw new RuntimeException('Unable to replace original image.');
+    }
+
+    if (!rename($temporaryPath, $path)) {
+        @rename($backupPath, $path);
+        @unlink($temporaryPath);
+        throw new RuntimeException('Unable to replace original image.');
+    }
+
+    @unlink($backupPath);
+
+    return [
+        'optimized' => true,
+        'beforeSize' => $beforeSize,
+        'afterSize' => $afterSize,
+        'savedBytes' => max(0, $beforeSize - $afterSize),
+        'width' => $targetWidth,
+        'height' => $targetHeight,
+    ];
 }
 
 function file_manager_public_url(array $root, string $absolutePath): string
@@ -692,6 +842,70 @@ try {
             'ok' => true,
             'message' => count($moved) === 1 ? 'Item moved.' : 'Selected items moved.',
             'data' => count($moved) === 1 ? $moved[0] : $moved,
+        ]);
+    }
+
+    if ($action === 'optimize') {
+        $requestedPaths = $payload['paths'] ?? null;
+        if (is_array($requestedPaths)) {
+            $paths = array_values(array_filter(array_map(static fn ($item): string => (string) $item, $requestedPaths)));
+        } else {
+            $paths = [$path];
+        }
+
+        if (empty($paths)) {
+            file_manager_json_error('Select at least one image to optimize.', 422);
+        }
+
+        $optimized = [];
+        $skipped = [];
+        $totalSaved = 0;
+
+        foreach ($paths as $sourcePath) {
+            $source = file_manager_absolute_path($root, $sourcePath);
+            if (!is_file($source) || !file_manager_is_image_file($source)) {
+                $skipped[] = [
+                    'path' => $sourcePath,
+                    'reason' => 'Not an image file.',
+                ];
+                continue;
+            }
+
+            try {
+                $result = file_manager_optimize_image_file($source);
+                $payloadItem = array_merge(file_manager_entry_payload($root, $source), $result);
+                if (!empty($result['optimized'])) {
+                    $totalSaved += (int) ($result['savedBytes'] ?? 0);
+                    $optimized[] = $payloadItem;
+                } else {
+                    $skipped[] = [
+                        'path' => $sourcePath,
+                        'reason' => 'Already optimized or smaller as-is.',
+                    ];
+                }
+            } catch (Throwable $error) {
+                $skipped[] = [
+                    'path' => $sourcePath,
+                    'reason' => $error->getMessage(),
+                ];
+            }
+        }
+
+        api_log_admin_action(
+            $db,
+            $admin,
+            'OPTIMIZE',
+            'Optimized ' . count($optimized) . ' image(s) through File Manager'
+        );
+
+        api_json([
+            'ok' => true,
+            'message' => 'Optimized ' . count($optimized) . ' image(s), saved ' . file_manager_format_bytes($totalSaved) . '.',
+            'data' => [
+                'optimized' => $optimized,
+                'skipped' => $skipped,
+                'savedBytes' => $totalSaved,
+            ],
         ]);
     }
 
