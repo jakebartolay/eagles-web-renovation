@@ -1184,10 +1184,6 @@
   font-weight: 700;
 }
 
-.members-table__edit {
-  min-width: 108px;
-}
-
 .events-table__description,
 .memorandum-table__description,
 .officers-table__position,
@@ -1217,6 +1213,7 @@
 .memorandum-table__actions,
 .officers-table__actions,
 .events-table__actions,
+.members-table__actions,
 .news-table__actions,
 .videos-table__actions,
 .users-table__actions {
@@ -1226,6 +1223,7 @@
 }
 
 .events-table__button,
+.members-table__button,
 .memorandum-table__button,
 .officers-table__button,
 .news-table__button,
@@ -1657,6 +1655,77 @@
   font-size: 13px;
   font-weight: 700;
   overflow-x: auto;
+}
+
+.csv-duplicate-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(155, 106, 22, 0.34);
+  border-radius: 8px;
+  background: rgba(155, 106, 22, 0.09);
+}
+
+.csv-duplicate-panel__header {
+  display: grid;
+  gap: 5px;
+}
+
+.csv-duplicate-panel__header span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--admin-warning);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.csv-duplicate-panel__header small {
+  color: var(--admin-muted);
+  line-height: 1.5;
+}
+
+.csv-duplicate-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(155, 106, 22, 0.2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.csv-duplicate-table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.csv-duplicate-table th,
+.csv-duplicate-table td {
+  padding: 11px 12px;
+  border-bottom: 1px solid rgba(16, 40, 74, 0.08);
+  text-align: left;
+  vertical-align: top;
+}
+
+.csv-duplicate-table thead th {
+  color: var(--admin-navy);
+  background: rgba(16, 40, 74, 0.06);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.csv-duplicate-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.csv-duplicate-table td:nth-child(2) {
+  color: var(--admin-navy);
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .admin-modal-grid {
@@ -2279,6 +2348,7 @@
   .memorandum-table__actions,
   .officers-table__actions,
   .events-table__actions,
+  .members-table__actions,
   .news-table__actions,
   .videos-table__actions,
   .users-table__actions {

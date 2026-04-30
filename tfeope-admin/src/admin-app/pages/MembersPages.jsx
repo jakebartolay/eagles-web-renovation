@@ -191,6 +191,7 @@ export function MembersPage({
   onCreateMember,
   onImportMembers,
   onEditMember,
+  onDeleteMember,
 }) {
   const [tableSearch, setTableSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -461,14 +462,24 @@ export function MembersPage({
                     <td data-label="Added">{dateAdded}</td>
                     {isSuperAdmin ? (
                       <td data-label="Actions">
-                        <button
-                          type="button"
-                          className="admin-secondary-button members-table__edit"
-                          onClick={() => onEditMember?.(item)}
-                        >
-                          <i className="fas fa-pen-to-square" aria-hidden="true"></i>
-                          Edit
-                        </button>
+                        <div className="members-table__actions">
+                          <button
+                            type="button"
+                            className="admin-secondary-button members-table__button"
+                            onClick={() => onEditMember?.(item)}
+                          >
+                            <i className="fas fa-pen-to-square" aria-hidden="true"></i>
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            className="admin-danger-button members-table__button"
+                            onClick={() => onDeleteMember?.(item)}
+                          >
+                            <i className="fas fa-trash-can" aria-hidden="true"></i>
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     ) : null}
                   </tr>

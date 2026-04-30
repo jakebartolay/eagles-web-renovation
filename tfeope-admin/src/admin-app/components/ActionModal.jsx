@@ -291,6 +291,49 @@ function CsvTemplateNote({ file }) {
   )
 }
 
+function CsvDuplicateTable({ duplicates = [], message = '' }) {
+  if (!Array.isArray(duplicates) || duplicates.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="csv-duplicate-panel" role="alert">
+      <div className="csv-duplicate-panel__header">
+        <span>
+          <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
+          Duplicate IDs skipped
+        </span>
+        {message ? <small>{message}</small> : null}
+      </div>
+
+      <div className="csv-duplicate-table-wrap">
+        <table className="csv-duplicate-table">
+          <thead>
+            <tr>
+              <th>Row</th>
+              <th>Eagles ID</th>
+              <th>Name</th>
+              <th>Club</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            {duplicates.map((duplicate, index) => (
+              <tr key={`${duplicate.id || 'duplicate'}-${duplicate.row || index}`}>
+                <td>{duplicate.row || '-'}</td>
+                <td>{duplicate.id || '-'}</td>
+                <td>{duplicate.name || '-'}</td>
+                <td>{duplicate.club || '-'}</td>
+                <td>{duplicate.reason || 'Duplicate member ID.'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function VideoFilesNote({ videoForm, isEditingVideo }) {
   const fileItems = [
     videoForm?.videoFilename ? { filename: videoForm.videoFilename, name: 'Current video' } : null,
@@ -1262,6 +1305,10 @@ export default function ActionModal({
         {mode === 'memberImport' && isSuperAdmin && (
           <form onSubmit={onMemberImportSubmit} className="admin-modal-form">
             <CsvTemplateNote file={memberImportForm?.file || null} />
+            <CsvDuplicateTable
+              duplicates={memberImportForm?.duplicates || []}
+              message={memberImportForm?.resultMessage || ''}
+            />
 
             <div className="admin-modal-grid">
               <Field

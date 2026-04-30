@@ -30,6 +30,7 @@ import {
   ADMIN_LOGOUT_ENDPOINT,
   ADMIN_MEMBERS_ENDPOINT,
   ADMIN_MEMBERS_CREATE_ENDPOINT,
+  ADMIN_MEMBERS_DELETE_ENDPOINT,
   ADMIN_MEMBERS_IMPORT_ENDPOINT,
   ADMIN_MEMBERS_UPDATE_ENDPOINT,
   ADMIN_MEMORANDUM_ENDPOINT,
@@ -635,6 +636,8 @@ function App() {
   })
   const [memberImportForm, setMemberImportForm] = useState({
     file: null,
+    duplicates: [],
+    resultMessage: '',
   })
   const isSidebarVisible = isMobileView ? sidebarOpen : !sidebarCollapsed
 
@@ -834,6 +837,8 @@ function App() {
   function resetMemberImportForm() {
     setMemberImportForm({
       file: null,
+      duplicates: [],
+      resultMessage: '',
     })
   }
 
@@ -1623,7 +1628,12 @@ function App() {
   }
 
   function updateMemberImportForm(field, value) {
-    setMemberImportForm((current) => ({ ...current, [field]: value }))
+    setMemberImportForm((current) => ({
+      ...current,
+      [field]: value,
+      duplicates: field === 'file' ? [] : current.duplicates,
+      resultMessage: field === 'file' ? '' : current.resultMessage,
+    }))
   }
 
   function updateRegionClubComposer(field, value) {
@@ -2179,6 +2189,55 @@ function App() {
     })
   }
 
+  function handleDeleteMember(item) {
+    if (!isSuperAdmin) {
+      setError('Only super admins can delete members.')
+      return
+    }
+
+    const memberId = String(item?.id || item?.eagles_id || '').trim()
+    if (memberId === '') {
+      setError('A valid member ID is required.')
+      return
+    }
+
+    const firstName = String(item?.firstName || item?.first_name || item?.eagles_firstName || '').trim()
+    const lastName = String(item?.lastName || item?.last_name || item?.eagles_lastName || '').trim()
+    const label = String(item?.fullName || item?.name || `${firstName} ${lastName}` || memberId).trim() || memberId
+
+    openDeleteConfirm({
+      title: 'Delete Member?',
+      message: `Delete "${label}" (${memberId}) permanently? This action cannot be undone.`,
+      confirmLabel: 'Delete Member',
+      onConfirm: async () => {
+        try {
+          setActionBusy(true)
+          setError('')
+          setNotice('')
+
+          await requestJson(ADMIN_MEMBERS_DELETE_ENDPOINT, {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+            body: JSON.stringify({ id: memberId }),
+          })
+
+          await runAdminRefresh({ silent: true })
+          setActivePage('members')
+          setOpenGroups((current) => ({ ...current, members: true }))
+          setNotice('Member deleted successfully.')
+        } catch (deleteError) {
+          setError(deleteError.message || 'Unable to delete the member.')
+        } finally {
+          setActionBusy(false)
+        }
+      },
+    })
+  }
+
   async function handleSaveOfficer(event) {
     event.preventDefault()
 
@@ -2601,10 +2660,23 @@ function App() {
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData,
       })
+      const duplicates = Array.isArray(payload?.data?.duplicates) ? payload.data.duplicates : []
 
       await runAdminRefresh({ silent: true })
-      setActivePage('members')
       setOpenGroups((current) => ({ ...current, members: true }))
+      setMemberImportForm((current) => ({
+        ...current,
+        duplicates,
+        resultMessage: payload?.message || '',
+      }))
+
+      if (duplicates.length > 0) {
+        setActivePage('members')
+        setNotice(payload?.message || 'Members imported with duplicate IDs skipped.')
+        return
+      }
+
+      setActivePage('members')
       setNotice(payload?.message || 'Members imported successfully.')
       closeActionModal(true)
       resetMemberImportForm()
@@ -3070,6 +3142,7 @@ function App() {
             onCreateMember={() => openActionModal('member')}
             onImportMembers={() => openActionModal('memberImport')}
             onEditMember={openMemberEditor}
+            onDeleteMember={handleDeleteMember}
           />
         )
       case 'users':

@@ -84,7 +84,7 @@ try {
         $storedPhoto = api_store_uploaded_file_as($photoUpload, 'members', $memberId, api_image_extensions(), true);
     }
 
-    $nextPhoto = $storedPhoto['filename'] ?? null;
+    $nextPhoto = $storedPhoto['filename'] ?? '';
 
     try {
         api_execute($db, '

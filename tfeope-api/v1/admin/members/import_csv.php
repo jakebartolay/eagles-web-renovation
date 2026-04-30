@@ -91,12 +91,15 @@ try {
     }
 
     $created = 0;
-    $updated = 0;
     $skipped = 0;
+    $duplicates = [];
+    $seenMemberIds = [];
+    $rowNumber = 1;
 
     $db->beginTransaction();
 
     while (($row = fgetcsv($handle)) !== false) {
+        $rowNumber++;
         $row = array_map(static fn ($value) => trim((string) $value), $row);
         $joined = trim(implode('', $row));
         if ($joined === '') {
@@ -124,6 +127,9 @@ try {
             $status = 'ACTIVE';
         }
 
+        $duplicateInFile = array_key_exists($memberId, $seenMemberIds);
+        $seenMemberIds[$memberId] = true;
+
         $existing = api_fetch_one($db, '
             SELECT eagles_id
             FROM user_info
@@ -131,26 +137,17 @@ try {
             LIMIT 1
         ', [':eagles_id' => $memberId]);
 
-        if ($existing !== null) {
-            api_execute($db, '
-                UPDATE user_info
-                SET eagles_firstName = :first_name,
-                    eagles_lastName = :last_name,
-                    eagles_position = :position,
-                    eagles_club = :club,
-                    eagles_region = :region,
-                    eagles_status = :status
-                WHERE eagles_id = :eagles_id
-            ', [
-                ':eagles_id' => $memberId,
-                ':first_name' => $firstName,
-                ':last_name' => $lastName,
-                ':position' => $position,
-                ':club' => $club,
-                ':region' => $region,
-                ':status' => $status,
-            ]);
-            $updated++;
+        if ($existing !== null || $duplicateInFile) {
+            $duplicates[] = [
+                'row' => $rowNumber,
+                'id' => $memberId,
+                'name' => trim($firstName . ' ' . $lastName),
+                'position' => $position,
+                'club' => $club,
+                'region' => $region,
+                'reason' => $duplicateInFile ? 'Duplicate ID in this CSV file.' : 'ID already exists in members.',
+            ];
+            $skipped++;
             continue;
         }
 
@@ -172,7 +169,7 @@ try {
                 :club,
                 :region,
                 :status,
-                NULL
+                :pic
             )
         ', [
             ':eagles_id' => $memberId,
@@ -182,6 +179,7 @@ try {
             ':club' => $club,
             ':region' => $region,
             ':status' => $status,
+            ':pic' => '',
         ]);
 
         $created++;
@@ -195,10 +193,10 @@ try {
         $admin,
         'IMPORT',
         sprintf(
-            'Imported members CSV "%s" (%d created, %d updated, %d skipped)',
+            'Imported members CSV "%s" (%d created, %d duplicates, %d skipped)',
             (string) ($csvFile['name'] ?? 'members.csv'),
             $created,
-            $updated,
+            count($duplicates),
             $skipped
         )
     );
@@ -206,15 +204,18 @@ try {
     api_json([
         'ok' => true,
         'message' => sprintf(
-            'CSV import completed. %d created, %d updated, %d skipped.',
+            'CSV import completed. %d created, %d duplicate%s, %d skipped.',
             $created,
-            $updated,
+            count($duplicates),
+            count($duplicates) === 1 ? '' : 's',
             $skipped
         ),
         'data' => [
             'created' => $created,
-            'updated' => $updated,
+            'updated' => 0,
             'skipped' => $skipped,
+            'duplicates' => $duplicates,
+            'duplicateCount' => count($duplicates),
         ],
     ]);
 } catch (Throwable $error) {
