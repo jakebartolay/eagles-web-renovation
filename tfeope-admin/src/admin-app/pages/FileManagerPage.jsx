@@ -30,6 +30,20 @@ function itemIcon(item) {
   return 'fa-file-lines'
 }
 
+function isImageFile(item) {
+  if (item?.type !== 'file') return false
+
+  return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'avif'].includes(
+    String(item?.extension || '').toLowerCase(),
+  )
+}
+
+function imagePreviewUrl(item) {
+  if (!isImageFile(item)) return ''
+
+  return item?.publicUrl || item?.downloadUrl || ''
+}
+
 function FileManagerLoading() {
   return (
     <section className="content-section-card file-manager-page">
@@ -496,51 +510,69 @@ export default function FileManagerPage({ endpoint, loading = false, onError, on
               <i className="fas fa-folder-open" aria-hidden="true"></i>
               <p>No files or folders found.</p>
             </div>
-          ) : visibleItems.map((item) => (
-            <button
-              type="button"
-              className={`file-manager-row ${selected?.path === item.path ? 'active' : ''} ${selectedPaths.includes(item.path) ? 'checked' : ''}`}
-              key={item.path || item.name}
-              onDoubleClick={() => item.type === 'folder' ? loadDirectory(rootId, item.path) : item.editable ? openEditor(item) : null}
-              onClick={() => selectItem(item)}
-            >
-              <span
-                className="file-manager-row__check"
-                role="checkbox"
-                aria-checked={selectedPaths.includes(item.path)}
-                tabIndex={0}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  toggleSelectedPath(item)
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault()
+          ) : visibleItems.map((item) => {
+            const previewUrl = imagePreviewUrl(item)
+
+            return (
+              <button
+                type="button"
+                className={`file-manager-row ${previewUrl ? 'has-preview' : ''} ${selected?.path === item.path ? 'active' : ''} ${selectedPaths.includes(item.path) ? 'checked' : ''}`}
+                key={item.path || item.name}
+                onDoubleClick={() => item.type === 'folder' ? loadDirectory(rootId, item.path) : item.editable ? openEditor(item) : null}
+                onClick={() => selectItem(item)}
+              >
+                <span
+                  className="file-manager-row__check"
+                  role="checkbox"
+                  aria-checked={selectedPaths.includes(item.path)}
+                  tabIndex={0}
+                  onClick={(event) => {
                     event.stopPropagation()
                     toggleSelectedPath(item)
-                  }
-                }}
-              >
-                <i className={`fas ${selectedPaths.includes(item.path) ? 'fa-check' : 'fa-plus'}`} aria-hidden="true"></i>
-              </span>
-              <span className="file-manager-row__icon">
-                <i className={`fas ${itemIcon(item)}`} aria-hidden="true"></i>
-              </span>
-              <span className="file-manager-row__main">
-                <strong>{item.name}</strong>
-                <small>{item.type === 'folder' ? 'Folder' : `${formatBytes(item.size)} | ${item.extension || 'file'}`}</small>
-              </span>
-              <span className="file-manager-row__meta">{item.modifiedAt || ''}</span>
-            </button>
-          ))}
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      event.stopPropagation()
+                      toggleSelectedPath(item)
+                    }
+                  }}
+                >
+                  <i className={`fas ${selectedPaths.includes(item.path) ? 'fa-check' : 'fa-plus'}`} aria-hidden="true"></i>
+                </span>
+                <span className="file-manager-row__icon">
+                  {previewUrl ? (
+                    <img src={previewUrl} alt="" loading="lazy" />
+                  ) : (
+                    <i className={`fas ${itemIcon(item)}`} aria-hidden="true"></i>
+                  )}
+                </span>
+                <span className="file-manager-row__main">
+                  <strong>{item.name}</strong>
+                  <small>{item.type === 'folder' ? 'Folder' : `${formatBytes(item.size)} | ${item.extension || 'file'}`}</small>
+                </span>
+                <span className="file-manager-row__meta">{item.modifiedAt || ''}</span>
+              </button>
+            )
+          })}
         </div>
 
         <aside className="file-manager-detail">
           {selected ? (
             <>
+              {imagePreviewUrl(selected) ? (
+                <div className="file-manager-image-preview">
+                  <img src={imagePreviewUrl(selected)} alt={selected.name} />
+                </div>
+              ) : null}
+
               <div className="file-manager-detail__header">
                 <span className="file-manager-row__icon">
-                  <i className={`fas ${itemIcon(selected)}`} aria-hidden="true"></i>
+                  {imagePreviewUrl(selected) ? (
+                    <img src={imagePreviewUrl(selected)} alt="" />
+                  ) : (
+                    <i className={`fas ${itemIcon(selected)}`} aria-hidden="true"></i>
+                  )}
                 </span>
                 <div>
                   <strong>{selected.name}</strong>
