@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 const modalCopy = {
   news: {
     eyebrow: 'Content Studio',
@@ -406,6 +408,47 @@ function CsvPhotoReport({ report = null }) {
       ) : (
         <small>All uploaded photos matched successfully.</small>
       )}
+    </div>
+  )
+}
+
+function CsvImportReport({ stats = null, duplicates = [], photoReport = null, message = '' }) {
+  const [open, setOpen] = useState(false)
+
+  if (!stats && !photoReport && (!Array.isArray(duplicates) || duplicates.length === 0)) {
+    return null
+  }
+
+  const missing = Array.isArray(photoReport?.missing) ? photoReport.missing : []
+  const unmatched = Array.isArray(photoReport?.unmatched) ? photoReport.unmatched : []
+  const invalid = Array.isArray(photoReport?.invalid) ? photoReport.invalid : []
+  const errors = Array.isArray(photoReport?.errors) ? photoReport.errors : []
+  const duplicateCount = Array.isArray(duplicates) ? duplicates.length : 0
+  const reviewCount = duplicateCount + missing.length + unmatched.length + invalid.length + errors.length
+
+  return (
+    <div className="csv-import-report">
+      <button type="button" className="csv-import-report__toggle" onClick={() => setOpen((current) => !current)}>
+        <span>
+          <i className={`fas ${open ? 'fa-eye-slash' : 'fa-eye'}`} aria-hidden="true"></i>
+          {open ? 'Hide import report' : 'Show import report'}
+        </span>
+        <strong>{stats?.created || 0} created · {stats?.photosAttached || 0} photos · {reviewCount} review</strong>
+      </button>
+
+      {open ? (
+        <div className="csv-import-report__body">
+          {message ? <p>{message}</p> : null}
+          <div className="csv-import-report__stats">
+            <span><strong>{stats?.created || 0}</strong>Created</span>
+            <span><strong>{stats?.updated || 0}</strong>Updated</span>
+            <span><strong>{stats?.skipped || 0}</strong>Skipped</span>
+            <span><strong>{stats?.photosAttached || 0}</strong>Photos</span>
+          </div>
+          <CsvDuplicateTable duplicates={duplicates} />
+          <CsvPhotoReport report={photoReport} />
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -1402,11 +1445,12 @@ export default function ActionModal({
         {mode === 'memberImport' && isSuperAdmin && (
           <form onSubmit={onMemberImportSubmit} className="admin-modal-form">
             <CsvTemplateNote file={memberImportForm?.file || null} />
-            <CsvDuplicateTable
+            <CsvImportReport
+              stats={memberImportForm?.importStats || null}
               duplicates={memberImportForm?.duplicates || []}
+              photoReport={memberImportForm?.photoReport || null}
               message={memberImportForm?.resultMessage || ''}
             />
-            <CsvPhotoReport report={memberImportForm?.photoReport || null} />
 
             <div className="admin-modal-grid">
               <Field

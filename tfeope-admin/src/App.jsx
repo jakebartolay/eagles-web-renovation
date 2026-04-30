@@ -258,6 +258,79 @@ function wait(ms) {
   })
 }
 
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const image = new Image()
+
+    image.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve(image)
+    }
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error('Unable to read image.'))
+    }
+
+    image.src = url
+  })
+}
+
+async function optimizeMemberImportPhoto(file) {
+  if (!(file instanceof File) || !String(file.type || '').startsWith('image/')) {
+    return file
+  }
+
+  if (String(file.type || '').toLowerCase().includes('gif')) {
+    return file
+  }
+
+  try {
+    const image = await loadImageFromFile(file)
+    const maxSize = 900
+    const scale = Math.min(1, maxSize / image.naturalWidth, maxSize / image.naturalHeight)
+    const width = Math.max(1, Math.round(image.naturalWidth * scale))
+    const height = Math.max(1, Math.round(image.naturalHeight * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+
+    const context = canvas.getContext('2d')
+    if (!context) {
+      return file
+    }
+
+    context.drawImage(image, 0, 0, width, height)
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/webp', 0.78)
+    })
+
+    if (!blob || blob.size <= 0 || blob.size >= file.size) {
+      return file
+    }
+
+    const baseName = file.name.replace(/\.[^.]+$/, '')
+    const extension = String(blob.type || '').includes('webp') ? 'webp' : 'jpg'
+    return new File([blob], `${baseName}.${extension}`, {
+      type: blob.type || 'image/jpeg',
+      lastModified: Date.now(),
+    })
+  } catch {
+    return file
+  }
+}
+
+async function optimizeMemberImportPhotos(files = []) {
+  const optimized = []
+  for (const file of files) {
+    optimized.push(await optimizeMemberImportPhoto(file))
+  }
+
+  return optimized
+}
+
 function normalizeAppointedForAdmin(items = []) {
   if (!Array.isArray(items)) {
     return []
@@ -647,6 +720,7 @@ function App() {
     photos: [],
     duplicates: [],
     photoReport: null,
+    importStats: null,
     resultMessage: '',
   })
   const isSidebarVisible = isMobileView ? sidebarOpen : !sidebarCollapsed
@@ -878,6 +952,7 @@ function App() {
       photos: [],
       duplicates: [],
       photoReport: null,
+      importStats: null,
       resultMessage: '',
     })
   }
@@ -1741,6 +1816,7 @@ function App() {
       [field]: value,
       duplicates: field === 'file' || field === 'photos' ? [] : current.duplicates,
       photoReport: field === 'file' || field === 'photos' ? null : current.photoReport,
+      importStats: field === 'file' || field === 'photos' ? null : current.importStats,
       resultMessage: field === 'file' || field === 'photos' ? '' : current.resultMessage,
     }))
   }
@@ -2780,9 +2856,18 @@ function App() {
       setError('')
       setNotice('')
 
+      const photos = memberImportForm.photos || []
+      setActionProgress((current) => (
+        current ? { ...current, label: photos.length > 0 ? 'Compressing photos before upload...' : 'Preparing CSV upload...' } : current
+      ))
+      const optimizedPhotos = await optimizeMemberImportPhotos(photos)
+      setActionProgress((current) => (
+        current ? { ...current, label: 'Uploading CSV and photos...' } : current
+      ))
+
       const formData = new FormData()
       formData.append('file', memberImportForm.file)
-      ;(memberImportForm.photos || []).forEach((photo) => {
+      optimizedPhotos.forEach((photo) => {
         formData.append('photos[]', photo)
       })
 
@@ -2808,6 +2893,13 @@ function App() {
         ...current,
         duplicates,
         photoReport,
+        importStats: {
+          created: Number(payload?.data?.created || 0) || 0,
+          updated: Number(payload?.data?.updated || 0) || 0,
+          skipped: Number(payload?.data?.skipped || 0) || 0,
+          duplicateCount: Number(payload?.data?.duplicateCount || duplicates.length) || 0,
+          photosAttached: photoReport.attached,
+        },
         resultMessage: payload?.message || '',
       }))
 
