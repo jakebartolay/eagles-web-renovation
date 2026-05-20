@@ -11,13 +11,6 @@ try {
     $db = api_db();
     $admin = api_require_admin($db);
 
-    if ((int) ($admin['role_id'] ?? 0) !== 1) {
-        api_json([
-            'success' => false,
-            'message' => 'Only super admins can add members.',
-        ], 403);
-    }
-
     if (!api_table_exists($db, 'user_info')) {
         api_json([
             'success' => false,

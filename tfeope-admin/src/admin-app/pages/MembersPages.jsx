@@ -163,8 +163,8 @@ function TableSearch({ value, onChange, placeholder, searching = false }) {
   )
 }
 
-function LoadingButtonsRow({ isSuperAdmin }) {
-  if (!isSuperAdmin) {
+function LoadingButtonsRow({ canManageMembers }) {
+  if (!canManageMembers) {
     return null
   }
 
@@ -195,6 +195,7 @@ export function MembersPage({
   onImportMembers,
   onEditMember,
   onDeleteMember,
+  canManageMembers = false,
 }) {
   const [tableSearch, setTableSearch] = useState('')
   const [settledTableSearch, setSettledTableSearch] = useState('')
@@ -308,7 +309,7 @@ export function MembersPage({
             tone: 'warm',
           },
         ]}
-        actions={<LoadingButtonsRow isSuperAdmin={isSuperAdmin} />}
+        actions={<LoadingButtonsRow canManageMembers={canManageMembers} />}
       >
         <div className="members-toolbar">
           <Skeleton variant="rounded" width={300} height={42} />
@@ -366,7 +367,7 @@ export function MembersPage({
           tone: 'warm',
         },
       ]}
-      actions={isSuperAdmin ? (
+      actions={canManageMembers ? (
         <>
           <button type="button" className="admin-secondary-button" onClick={onImportMembers}>
             <i className="fas fa-file-arrow-up" aria-hidden="true"></i>

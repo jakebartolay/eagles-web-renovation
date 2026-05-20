@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 const modalCopy = {
   news: {
@@ -412,8 +412,395 @@ function CsvPhotoReport({ report = null }) {
   )
 }
 
+function parseCsvPreview(text) {
+  const rows = []
+  let current = []
+  let value = ''
+  let quoted = false
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]
+    const next = text[index + 1]
+
+    if (char === '"' && quoted && next === '"') {
+      value += '"'
+      index += 1
+      continue
+    }
+
+    if (char === '"') {
+      quoted = !quoted
+      continue
+    }
+
+    if (char === ',' && !quoted) {
+      current.push(value.trim())
+      value = ''
+      continue
+    }
+
+    if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && next === '\n') {
+        index += 1
+      }
+      current.push(value.trim())
+      if (current.some((cell) => cell !== '')) {
+        rows.push(current)
+      }
+      current = []
+      value = ''
+      continue
+    }
+
+    value += char
+  }
+
+  current.push(value.trim())
+  if (current.some((cell) => cell !== '')) {
+    rows.push(current)
+  }
+
+  return rows
+}
+
+function normalizeCsvHeader(header) {
+  return String(header || '')
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+function formatFileSize(bytes) {
+  const size = Number(bytes || 0) || 0
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} Mb`
+  }
+
+  return `${Math.max(1, Math.round(size / 1024))} Kb`
+}
+
+function UploadQueuePreview({ file = null, photos = [], submitting = false, hasResults = false, resultItems = [] }) {
+  const [imageUrls, setImageUrls] = useState({})
+  const [progressTick, setProgressTick] = useState(0)
+
+  useEffect(() => {
+    const imageFiles = (Array.isArray(photos) ? photos : [])
+      .filter((photo) => photo instanceof File && String(photo.type || '').startsWith('image/'))
+      .slice(0, 10)
+
+    const urls = Object.fromEntries(imageFiles.map((photo) => [photo.name, URL.createObjectURL(photo)]))
+    setImageUrls(urls)
+
+    return () => {
+      Object.values(urls).forEach((url) => URL.revokeObjectURL(url))
+    }
+  }, [photos])
+
+  useEffect(() => {
+    if (!submitting || hasResults) {
+      setProgressTick(0)
+      return undefined
+    }
+
+    const timer = window.setInterval(() => {
+      setProgressTick((current) => Math.min(18, current + 1))
+    }, 360)
+
+    return () => window.clearInterval(timer)
+  }, [submitting, hasResults, file, photos])
+
+  const photoItems = (Array.isArray(photos) ? photos : []).map((photo, index) => {
+    const matchedResult = resultItems.find((item) => {
+      const photoFile = String(item?.photoFile || '').trim().toLowerCase()
+      const uploadName = String(photo?.name || '').trim().toLowerCase()
+      const uploadBase = uploadName.replace(/\.[^.]+$/, '')
+      return photoFile === uploadName || photoFile.startsWith(uploadBase)
+    })
+    const photoStatus = String(matchedResult?.photoStatus || '').trim()
+    const done = ['attached', 'attached_to_existing'].includes(photoStatus)
+
+    return {
+      key: `photo-${photo.name}-${index}`,
+      name: photo.name,
+      size: photo.size,
+      type: 'Image',
+      icon: 'fa-image',
+      thumbnail: imageUrls[photo.name] || '',
+      progress: hasResults ? (done ? 100 : 92) : submitting ? Math.min(100, 8 + progressTick * (5 + (index % 3)) + index * 4) : 0,
+      status: hasResults ? (done ? 'Complete' : 'Review') : submitting ? 'Uploading' : 'Ready',
+      tone: done ? 'success' : index % 3 === 0 ? 'teal' : index % 3 === 1 ? 'gold' : 'blue',
+    }
+  })
+
+  const queueItems = [
+    file ? {
+      key: 'csv-file',
+      name: file.name,
+      size: file.size,
+      type: 'CSV',
+      icon: 'fa-file-csv',
+      progress: hasResults ? 100 : submitting ? Math.min(100, 18 + progressTick * 6) : 0,
+      status: hasResults ? 'Complete' : submitting ? 'Uploading' : 'Ready',
+      tone: 'blue',
+    } : null,
+    ...photoItems,
+  ]
+    .filter(Boolean)
+    .map((item) => ({
+      ...item,
+      complete: item.progress >= 100 || item.status === 'Complete',
+      status: item.progress >= 100 ? 'Complete' : item.status,
+    }))
+    .sort((first, second) => {
+      if (first.complete !== second.complete) {
+        return first.complete ? 1 : -1
+      }
+
+      return first.name.localeCompare(second.name)
+    })
+
+  if (!queueItems.length) {
+    return null
+  }
+
+  return (
+    <div className="csv-file-upload-panel">
+      <div className="csv-file-upload-panel__drop">
+        <i className="fas fa-arrow-up-from-bracket" aria-hidden="true"></i>
+        <strong>Drag your file here</strong>
+        <span>or</span>
+        <small>Browse CSV and member images below</small>
+      </div>
+
+      <div className="csv-file-upload-panel__queue">
+        {queueItems.slice(0, 14).map((item, index) => (
+          <div className="csv-file-upload-row" key={item.key}>
+            <div className="csv-file-upload-row__media">
+              {item.thumbnail ? (
+                <img src={item.thumbnail} alt={item.name} />
+              ) : (
+                <i className={`fas ${item.icon}`} aria-hidden="true"></i>
+              )}
+            </div>
+
+            <div className="csv-file-upload-row__main">
+              <div className="csv-file-upload-row__topline">
+                <strong>{item.name}</strong>
+                <small>{item.type}</small>
+              </div>
+              <div className="csv-file-upload-row__track" aria-hidden="true">
+                <span
+                  className={`tone-${item.tone}`}
+                  style={{ width: `${Math.max(6, Math.min(100, item.progress))}%` }}
+                ></span>
+              </div>
+              <div className="csv-file-upload-row__meta">
+                <span>{item.status}</span>
+                <span>{formatFileSize(item.size)}</span>
+              </div>
+            </div>
+
+          </div>
+        ))}
+        {queueItems.length > 14 ? (
+          <small className="csv-file-upload-panel__more">+{queueItems.length - 14} more upload item(s)</small>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function CsvUploadTracker({
+  file = null,
+  photos = [],
+  submitting = false,
+  stats = null,
+  items = [],
+}) {
+  const [open, setOpen] = useState(true)
+  const [previewRows, setPreviewRows] = useState([])
+  const [previewError, setPreviewError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+
+    setPreviewRows([])
+    setPreviewError('')
+
+    if (!file) {
+      return undefined
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      if (cancelled) return
+
+      try {
+        const rows = parseCsvPreview(String(reader.result || ''))
+        const header = rows[0] || []
+        const headerMap = Object.fromEntries(
+          header.map((entry, index) => [normalizeCsvHeader(entry), index]),
+        )
+
+        const dataRows = rows.slice(1).map((row, index) => {
+          const id = String(row[headerMap.id] || '').trim()
+          const firstName = String(row[headerMap.first_name] || '').trim()
+          const lastName = String(row[headerMap.last_name] || '').trim()
+          const club = String(row[headerMap.club] || '').trim()
+          const region = String(row[headerMap.region] || '').trim()
+          const status = String(row[headerMap.status] || 'ACTIVE').trim() || 'ACTIVE'
+
+          return {
+            row: index + 2,
+            id,
+            name: `${firstName} ${lastName}`.trim(),
+            club,
+            region,
+            status,
+          }
+        }).filter((row) => (
+          row.id !== ''
+          || row.name !== ''
+          || row.club !== ''
+          || row.region !== ''
+        ))
+
+        setPreviewRows(dataRows)
+      } catch {
+        setPreviewError('Unable to preview CSV rows.')
+      }
+    }
+    reader.onerror = () => {
+      if (!cancelled) {
+        setPreviewError('Unable to read selected CSV file.')
+      }
+    }
+    reader.readAsText(file)
+
+    return () => {
+      cancelled = true
+      if (reader.readyState === FileReader.LOADING) {
+        reader.abort()
+      }
+    }
+  }, [file])
+
+  const resultItems = Array.isArray(items) ? items : []
+  const photoItems = Array.isArray(photos) ? photos : []
+  const hasResults = resultItems.length > 0 || stats
+  const rowsToShow = hasResults ? resultItems : previewRows
+  const createdCount = Number(stats?.created || 0) || 0
+  const skippedCount = Number(stats?.skipped || 0) || 0
+  const photoCount = Number(stats?.photosAttached || 0) || 0
+  const totalRows = hasResults ? resultItems.length : previewRows.length
+  const summaryLabel = submitting
+    ? 'Uploading and processing...'
+    : hasResults
+      ? `${createdCount} created, ${skippedCount} skipped, ${photoCount} photos`
+      : `${totalRows} CSV rows, ${photoItems.length} photos selected`
+
+  if (!file && photoItems.length === 0 && !hasResults) {
+    return null
+  }
+
+  return (
+    <div className={`csv-upload-tracker ${submitting ? 'is-loading' : ''}`}>
+      <button type="button" className="csv-upload-tracker__summary" onClick={() => setOpen((current) => !current)}>
+        <span className="csv-upload-tracker__icon">
+          <i className={`fas ${submitting ? 'fa-circle-notch fa-spin' : hasResults ? 'fa-clipboard-check' : 'fa-file-csv'}`} aria-hidden="true"></i>
+        </span>
+        <span>
+          <strong>{hasResults ? 'Import result' : 'Upload monitor'}</strong>
+          <small>{summaryLabel}</small>
+        </span>
+        <i className={`fas ${open ? 'fa-chevron-up' : 'fa-chevron-down'}`} aria-hidden="true"></i>
+      </button>
+
+      {open ? (
+        <div className="csv-upload-tracker__body">
+          <UploadQueuePreview
+            file={file}
+            photos={photoItems}
+            submitting={submitting}
+            hasResults={Boolean(hasResults)}
+            resultItems={resultItems}
+          />
+
+          {file ? (
+            <div className="csv-upload-tracker__file">
+              <span><i className="fas fa-table" aria-hidden="true"></i> {file.name}</span>
+              <small>{Math.max(1, Math.round(file.size / 1024))} KB</small>
+            </div>
+          ) : null}
+
+          {previewError ? <p className="csv-upload-tracker__error">{previewError}</p> : null}
+
+          {rowsToShow.length > 0 ? (
+            <div className="csv-upload-tracker__table-wrap">
+              <table className="csv-upload-tracker__table">
+                <thead>
+                  <tr>
+                    <th>Row</th>
+                    <th>Eagles ID</th>
+                    <th>Member</th>
+                    <th>Club</th>
+                    <th>Result</th>
+                    <th>Image</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rowsToShow.slice(0, 80).map((item, index) => {
+                    const result = String(item?.status || (hasResults ? 'processed' : 'ready')).trim()
+                    const photoStatus = String(item?.photoStatus || '').trim()
+                    const photoLabel = hasResults
+                      ? photoStatus.replace(/_/g, ' ') || 'none'
+                      : 'waiting'
+
+                    return (
+                      <tr key={`${item?.row || index}-${item?.id || item?.name || index}`}>
+                        <td>{item?.row || '-'}</td>
+                        <td>{item?.id || 'Auto ID'}</td>
+                        <td>{item?.name || '-'}</td>
+                        <td>{item?.club || '-'}</td>
+                        <td><span className={`csv-upload-status ${result}`}>{result}</span></td>
+                        <td>
+                          <span className={`csv-upload-status ${photoStatus || 'waiting'}`}>
+                            {photoLabel}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {rowsToShow.length > 80 ? <small>Showing first 80 rows only.</small> : null}
+            </div>
+          ) : null}
+
+          {photoItems.length > 0 ? (
+            <div className="csv-upload-tracker__photos">
+              <strong>Selected images</strong>
+              <div>
+                {photoItems.slice(0, 36).map((photo, index) => (
+                  <span key={`${photo.name}-${index}`}>
+                    <i className="fas fa-image" aria-hidden="true"></i>
+                    {photo.name}
+                  </span>
+                ))}
+              </div>
+              {photoItems.length > 36 ? <small>+{photoItems.length - 36} more image(s)</small> : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function CsvImportReport({ stats = null, duplicates = [], photoReport = null, message = '' }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
 
   if (!stats && !photoReport && (!Array.isArray(duplicates) || duplicates.length === 0)) {
     return null
@@ -425,7 +812,6 @@ function CsvImportReport({ stats = null, duplicates = [], photoReport = null, me
   const errors = Array.isArray(photoReport?.errors) ? photoReport.errors : []
   const duplicateCount = Array.isArray(duplicates) ? duplicates.length : 0
   const reviewCount = duplicateCount + missing.length + unmatched.length + invalid.length + errors.length
-
   return (
     <div className="csv-import-report">
       <button type="button" className="csv-import-report__toggle" onClick={() => setOpen((current) => !current)}>
@@ -537,6 +923,8 @@ export default function ActionModal({
   regionClubMap = {},
   governors = [],
   isSuperAdmin,
+  canManageMembers = false,
+  canManageRegionClubs = false,
 }) {
   if (!open) return null
 
@@ -1176,7 +1564,7 @@ export default function ActionModal({
           </form>
         )}
 
-        {mode === 'regionClub' && isSuperAdmin && (
+        {mode === 'regionClub' && canManageRegionClubs && (
           <form onSubmit={onRegionClubSubmit} className="admin-modal-form">
             <div className="admin-modal-note">
               <span>Separate setup flow</span>
@@ -1191,7 +1579,7 @@ export default function ActionModal({
                   required
                 >
                   <option value="" disabled>Select governor and region</option>
-                  <option value="__NEW__">+ Add new governor</option>
+                  {isSuperAdmin ? <option value="__NEW__">+ Add new governor</option> : null}
                   {governorRegionOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -1200,7 +1588,7 @@ export default function ActionModal({
                 </select>
               </Field>
 
-              {hasSelectedExistingRegion ? (
+              {hasSelectedExistingRegion && isSuperAdmin ? (
                 <Field
                   label="Setup action"
                   helper="Pick whether you want to add a club or rename the selected region."
@@ -1279,7 +1667,7 @@ export default function ActionModal({
           </form>
         )}
 
-        {(mode === 'member' || mode === 'editMember') && isSuperAdmin && (
+        {(mode === 'member' || mode === 'editMember') && (isEditingMember ? isSuperAdmin : canManageMembers) && (
           <form onSubmit={onMemberSubmit} className="admin-modal-form">
             <div className="member-editor-layout">
               <MemberPreview memberForm={memberForm} isEditingMember={isEditingMember} />
@@ -1442,58 +1830,63 @@ export default function ActionModal({
           </form>
         )}
 
-        {mode === 'memberImport' && isSuperAdmin && (
+        {mode === 'memberImport' && canManageMembers && (
           <form onSubmit={onMemberImportSubmit} className="admin-modal-form">
-            <CsvTemplateNote file={memberImportForm?.file || null} />
-            <CsvImportReport
-              stats={memberImportForm?.importStats || null}
-              duplicates={memberImportForm?.duplicates || []}
-              photoReport={memberImportForm?.photoReport || null}
-              message={memberImportForm?.resultMessage || ''}
-            />
+            {memberImportForm?.importStats ? (
+              <CsvImportReport
+                stats={memberImportForm?.importStats || null}
+                duplicates={memberImportForm?.duplicates || []}
+                photoReport={memberImportForm?.photoReport || null}
+                message={memberImportForm?.resultMessage || ''}
+              />
+            ) : (
+              <>
+                <CsvTemplateNote file={memberImportForm?.file || null} />
 
-            <div className="admin-modal-grid">
-              <Field
-                label="CSV file"
-                fullWidth
-                helper="Accepts .csv files that follow the sample Thailand Eagles Club layout."
-              >
-                <input
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(event) => onMemberImportFieldChange('file', event.target.files?.[0] || null)}
-                  required
-                />
-              </Field>
-              <Field
-                label="Member photos"
-                fullWidth
-                helper="Optional. Select many photos. Filename must match Eagles ID, for example EAG_001.png."
-              >
-                <input
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.jfif,image/*"
-                  multiple
-                  onChange={(event) => onMemberImportFieldChange('photos', Array.from(event.target.files || []))}
-                />
-                {memberImportForm?.photos?.length ? (
-                  <small>{memberImportForm.photos.length} photo file(s) selected.</small>
-                ) : null}
-              </Field>
-            </div>
+                <div className="admin-modal-grid">
+                  <Field
+                    label="CSV file"
+                    fullWidth
+                    helper="Accepts .csv files that follow the sample Thailand Eagles Club layout."
+                  >
+                    <input
+                      type="file"
+                      accept=".csv,text/csv"
+                      onChange={(event) => onMemberImportFieldChange('file', event.target.files?.[0] || null)}
+                      required
+                    />
+                  </Field>
+                  <Field
+                    label="Member photos"
+                    fullWidth
+                    helper="Optional. Select many photos. Filename must match Eagles ID, for example EAG_001.png."
+                  >
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.jfif,image/*"
+                      multiple
+                      onChange={(event) => onMemberImportFieldChange('photos', Array.from(event.target.files || []))}
+                    />
+                    {memberImportForm?.photos?.length ? (
+                      <small>{memberImportForm.photos.length} photo file(s) selected.</small>
+                    ) : null}
+                  </Field>
+                </div>
 
-            <div className="admin-modal-actions">
-              <button type="button" className="admin-secondary-button" onClick={onClose}>
-                Cancel
-              </button>
-              <button type="submit" className="admin-primary-button" disabled={submitting}>
-                <i
-                  className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-file-arrow-up'}`}
-                  aria-hidden="true"
-                ></i>
-                {submitting ? 'Importing...' : copy.submitLabel}
-              </button>
-            </div>
+                <div className="admin-modal-actions">
+                  <button type="button" className="admin-secondary-button" onClick={onClose}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="admin-primary-button" disabled={submitting}>
+                    <i
+                      className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-file-arrow-up'}`}
+                      aria-hidden="true"
+                    ></i>
+                    {submitting ? 'Importing...' : copy.submitLabel}
+                  </button>
+                </div>
+              </>
+            )}
           </form>
         )}
 

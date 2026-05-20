@@ -99,13 +99,6 @@ try {
     $db = api_db();
     $admin = api_require_admin($db);
 
-    if ((int) ($admin['role_id'] ?? 0) !== 1) {
-        api_json([
-            'ok' => false,
-            'message' => 'Only super admins can import members.',
-        ], 403);
-    }
-
     if (!api_table_exists($db, 'user_info')) {
         api_json([
             'ok' => false,
@@ -170,6 +163,7 @@ try {
     $duplicates = [];
     $missingPhotos = [];
     $photoErrors = [];
+    $importItems = [];
     $matchedPhotoKeys = [];
     $photoPayload = member_import_photo_payload();
     $photoUploadsById = $photoPayload['photos'];
@@ -199,7 +193,21 @@ try {
             $memberId = member_import_generate_id();
         }
 
+        $memberName = trim($firstName . ' ' . $lastName);
+
         if ($firstName === '' || $lastName === '' || $position === '' || $club === '' || $region === '') {
+            $importItems[] = [
+                'row' => $rowNumber,
+                'id' => $memberId,
+                'name' => $memberName,
+                'position' => $position,
+                'club' => $club,
+                'region' => $region,
+                'status' => 'skipped',
+                'photoStatus' => 'not_checked',
+                'photoFile' => '',
+                'reason' => 'Required member fields are incomplete.',
+            ];
             $skipped++;
             continue;
         }
@@ -222,6 +230,10 @@ try {
         ', [':eagles_id' => $memberId]);
 
         if ($existing !== null || $duplicateInFile) {
+            $photoStatus = 'missing';
+            $photoFile = is_array($photoUpload) ? (string) ($photoUpload['name'] ?? '') : '';
+            $photoReason = 'No matching photo uploaded.';
+
             if ($existing !== null && is_array($photoUpload) && !isset($matchedPhotoKeys[$photoKey])) {
                 try {
                     $storedPhoto = api_store_uploaded_file_as($photoUpload, 'members', $memberId, api_image_extensions(), true);
@@ -235,7 +247,12 @@ try {
                     ]);
                     $matchedPhotoKeys[$photoKey] = true;
                     $photoAttached++;
+                    $photoStatus = 'attached_to_existing';
+                    $photoFile = (string) ($storedPhoto['filename'] ?? $photoFile);
+                    $photoReason = 'Photo attached to existing member.';
                 } catch (Throwable $photoError) {
+                    $photoStatus = 'error';
+                    $photoReason = $photoError->getMessage();
                     $photoErrors[] = [
                         'row' => $rowNumber,
                         'id' => $memberId,
@@ -254,23 +271,45 @@ try {
             $duplicates[] = [
                 'row' => $rowNumber,
                 'id' => $memberId,
-                'name' => trim($firstName . ' ' . $lastName),
+                'name' => $memberName,
                 'position' => $position,
                 'club' => $club,
                 'region' => $region,
                 'reason' => $duplicateInFile ? 'Duplicate ID in this CSV file.' : 'ID already exists in members.',
+            ];
+            $importItems[] = [
+                'row' => $rowNumber,
+                'id' => $memberId,
+                'name' => $memberName,
+                'position' => $position,
+                'club' => $club,
+                'region' => $region,
+                'status' => 'duplicate',
+                'photoStatus' => $photoStatus,
+                'photoFile' => $photoFile,
+                'reason' => $duplicateInFile ? 'Duplicate ID in this CSV file.' : 'ID already exists in members.',
+                'photoReason' => $photoReason,
             ];
             $skipped++;
             continue;
         }
 
         $storedPhoto = null;
+        $photoStatus = 'missing';
+        $photoFile = '';
+        $photoReason = 'No matching photo uploaded.';
         if (is_array($photoUpload)) {
             try {
                 $storedPhoto = api_store_uploaded_file_as($photoUpload, 'members', $memberId, api_image_extensions(), true);
                 $matchedPhotoKeys[$photoKey] = true;
                 $photoAttached++;
+                $photoStatus = 'attached';
+                $photoFile = (string) ($storedPhoto['filename'] ?? ($photoUpload['name'] ?? ''));
+                $photoReason = 'Photo attached.';
             } catch (Throwable $photoError) {
+                $photoStatus = 'error';
+                $photoFile = (string) ($photoUpload['name'] ?? '');
+                $photoReason = $photoError->getMessage();
                 $photoErrors[] = [
                     'row' => $rowNumber,
                     'id' => $memberId,
@@ -316,6 +355,20 @@ try {
             ':status' => $status,
             ':pic' => $storedPhoto['filename'] ?? '',
         ]);
+
+        $importItems[] = [
+            'row' => $rowNumber,
+            'id' => $memberId,
+            'name' => $memberName,
+            'position' => $position,
+            'club' => $club,
+            'region' => $region,
+            'status' => 'created',
+            'photoStatus' => $photoStatus,
+            'photoFile' => $photoFile,
+            'reason' => 'Member created.',
+            'photoReason' => $photoReason,
+        ];
 
         $created++;
     }
@@ -372,6 +425,7 @@ try {
             'unmatchedPhotos' => $unmatchedPhotos,
             'invalidPhotos' => $invalidPhotos,
             'photoErrors' => $photoErrors,
+            'items' => $importItems,
         ],
     ]);
 } catch (Throwable $error) {

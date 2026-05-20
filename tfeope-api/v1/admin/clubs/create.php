@@ -11,13 +11,6 @@ try {
     $db = api_db();
     $admin = api_require_admin($db);
 
-    if ((int) ($admin['role_id'] ?? 0) !== 1) {
-        api_json([
-            'success' => false,
-            'message' => 'Only super admins can create clubs.',
-        ], 403);
-    }
-
     if (!api_table_exists($db, 'clubs')) {
         api_json([
             'success' => false,

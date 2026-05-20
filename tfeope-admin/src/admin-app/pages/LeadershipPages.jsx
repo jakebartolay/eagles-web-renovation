@@ -307,6 +307,7 @@ export function GovernorsPage({
   query = '',
   loading = false,
   isSuperAdmin = false,
+  canManageRegionClubs = false,
   onCreateRegionClub,
   onEditGovernor,
   onDeleteGovernor,
@@ -347,7 +348,7 @@ export function GovernorsPage({
             <h2>Governors</h2>
             <p>Loading governor records...</p>
           </div>
-          {isSuperAdmin ? (
+          {canManageRegionClubs ? (
             <div className="content-section-card__actions">
               <Skeleton variant="rounded" width={182} height={40} />
             </div>
@@ -387,7 +388,7 @@ export function GovernorsPage({
           <h2>Governors</h2>
           <p>{filteredItems.length} governor record(s) currently tracked.</p>
         </div>
-        {isSuperAdmin ? (
+        {canManageRegionClubs ? (
           <div className="content-section-card__actions">
             <button type="button" className="admin-secondary-button" onClick={onCreateRegionClub}>
               <i className="fas fa-map-location-dot" aria-hidden="true"></i>

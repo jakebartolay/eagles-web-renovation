@@ -553,6 +553,148 @@ function AdminNotFoundPage({
   )
 }
 
+function formatUploadSize(bytes) {
+  const size = Number(bytes || 0) || 0
+  if (size >= 1024 * 1024) {
+    return `${(size / (1024 * 1024)).toFixed(size >= 10 * 1024 * 1024 ? 0 : 1)} Mb`
+  }
+
+  return `${Math.max(1, Math.round(size / 1024))} Kb`
+}
+
+function UploadingPhotoPreview({ file = null, photos = [] }) {
+  const [previews, setPreviews] = useState([])
+  const [progressTick, setProgressTick] = useState(0)
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const imageFiles = (Array.isArray(photos) ? photos : [])
+      .filter((photo) => photo instanceof File && String(photo.type || '').startsWith('image/'))
+      .slice(0, 12)
+
+    const nextPreviews = imageFiles.map((photo) => ({
+      name: photo.name,
+      size: photo.size,
+      url: URL.createObjectURL(photo),
+    }))
+
+    setPreviews(nextPreviews)
+
+    return () => {
+      nextPreviews.forEach((preview) => URL.revokeObjectURL(preview.url))
+    }
+  }, [photos])
+
+  useEffect(() => {
+    setProgressTick(0)
+
+    const timer = window.setInterval(() => {
+      setProgressTick((current) => Math.min(18, current + 1))
+    }, 360)
+
+    return () => window.clearInterval(timer)
+  }, [file, photos])
+
+  if (!previews.length) {
+    if (!file) {
+      return null
+    }
+  }
+
+  const hiddenCount = Math.max(0, (Array.isArray(photos) ? photos.length : 0) - previews.length)
+  const queueItems = [
+    file ? {
+      key: 'csv',
+      name: file.name,
+      size: file.size,
+      image: '',
+      icon: 'fa-file-csv',
+      progress: Math.min(100, progressTick * 6),
+      tone: 'blue',
+    } : null,
+    ...previews.map((preview, index) => ({
+      key: preview.url,
+      name: preview.name,
+      size: preview.size,
+      image: preview.url,
+      icon: 'fa-image',
+      progress: Math.min(100, progressTick * (5 + (index % 3)) + index * 3),
+      tone: index % 3 === 0 ? 'teal' : index % 3 === 1 ? 'gold' : 'blue',
+    })),
+  ]
+    .filter(Boolean)
+    .map((item) => ({
+      ...item,
+      complete: item.progress >= 100,
+      status: item.progress >= 100 ? 'Complete' : 'Uploading',
+    }))
+    .sort((first, second) => {
+      if (first.complete !== second.complete) {
+        return first.complete ? 1 : -1
+      }
+
+      return first.name.localeCompare(second.name)
+    })
+
+  return (
+    <div className="admin-uploading-photos" aria-label="Uploading member files">
+      <div className="admin-uploading-photos__header">
+        <span>Uploading files</span>
+        <div className="admin-uploading-photos__header-actions">
+          <strong>{queueItems.length + hiddenCount}</strong>
+          <button type="button" onClick={() => setVisible((current) => !current)}>
+            {visible ? 'Hide' : 'Show'}
+          </button>
+        </div>
+      </div>
+      {visible ? (
+        <div className="admin-uploading-photos__queue">
+          {queueItems.map((item) => (
+            <div className="admin-uploading-file-row" key={item.key}>
+              <div className="admin-uploading-file-row__media">
+                {item.image ? <img src={item.image} alt={item.name} /> : <i className={`fas ${item.icon}`} aria-hidden="true"></i>}
+              </div>
+              <div className="admin-uploading-file-row__main">
+                <div className="admin-uploading-file-row__topline">
+                  <strong>{item.name}</strong>
+                  <small>{item.progress}%</small>
+                </div>
+                <div className="admin-uploading-file-row__track" aria-hidden="true">
+                  <span className={`tone-${item.tone}`} style={{ width: `${item.progress}%` }}></span>
+                </div>
+                <div className="admin-uploading-file-row__meta">
+                  <span>{item.status}</span>
+                  <span>{formatUploadSize(item.size)}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+          {hiddenCount > 0 ? (
+            <span className="admin-uploading-photos__more">+{hiddenCount}</span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function currentUploadLabel(file = null, photos = [], tick = 0) {
+  const imageFiles = (Array.isArray(photos) ? photos : [])
+    .filter((photo) => photo instanceof File)
+
+  const files = [
+    file ? file : null,
+    ...imageFiles,
+  ].filter(Boolean)
+
+  if (!files.length) {
+    return ''
+  }
+
+  const index = Math.min(files.length - 1, Math.floor(tick / 2))
+  return `Uploading ${files[index].name}...`
+}
+
 function App() {
   const initialPage = resolveInitialPage()
 
@@ -588,6 +730,7 @@ function App() {
   const [actionModal, setActionModal] = useState(null)
   const [actionBusy, setActionBusy] = useState(false)
   const [actionProgress, setActionProgress] = useState(null)
+  const [uploadLabelTick, setUploadLabelTick] = useState(0)
   const [memberIdCheckReady, setMemberIdCheckReady] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState({
     open: false,
@@ -720,12 +863,15 @@ function App() {
     photos: [],
     duplicates: [],
     photoReport: null,
+    importItems: [],
     importStats: null,
     resultMessage: '',
   })
   const isSidebarVisible = isMobileView ? sidebarOpen : !sidebarCollapsed
 
   const isSuperAdmin = resolveAdminRoleId(user) === 1
+  const canManageMembers = [1, 2].includes(resolveAdminRoleId(user))
+  const canManageRegionClubs = canManageMembers
   const governorRegionCatalog = buildGovernorRegionCatalog(collections.governors)
   const regionCatalogByKey = governorRegionCatalog.byKey
   const regionClubMap = governorRegionCatalog.regionClubMap
@@ -952,6 +1098,7 @@ function App() {
       photos: [],
       duplicates: [],
       photoReport: null,
+      importItems: [],
       importStats: null,
       resultMessage: '',
     })
@@ -1292,6 +1439,19 @@ function App() {
     return () => window.clearInterval(timer)
   }, [actionProgress?.active])
 
+  useEffect(() => {
+    if (!actionBusy || actionModal !== 'memberImport') {
+      setUploadLabelTick(0)
+      return undefined
+    }
+
+    const timer = window.setInterval(() => {
+      setUploadLabelTick((current) => current + 1)
+    }, 650)
+
+    return () => window.clearInterval(timer)
+  }, [actionBusy, actionModal])
+
   function startActionProgress(label) {
     setActionProgress({
       active: true,
@@ -1427,8 +1587,23 @@ function App() {
   }
 
   function openActionModal(mode) {
+    if (['member', 'memberImport'].includes(mode) && !canManageMembers) {
+      setError('Only admins can manage members.')
+      return
+    }
+
+    if (mode === 'editMember' && !isSuperAdmin) {
+      setError('Only super admins can edit members.')
+      return
+    }
+
+    if (mode === 'regionClub' && !canManageRegionClubs) {
+      setError('Only admins can manage region and club setup.')
+      return
+    }
+
     if (
-      ['member', 'editMember', 'memberImport', 'regionClub', 'appointed', 'editAppointed', 'pastLeader', 'editPastLeader'].includes(mode)
+      ['appointed', 'editAppointed', 'pastLeader', 'editPastLeader'].includes(mode)
       && !isSuperAdmin
     ) {
       setError('Only super admins can manage this section.')
@@ -1816,6 +1991,7 @@ function App() {
       [field]: value,
       duplicates: field === 'file' || field === 'photos' ? [] : current.duplicates,
       photoReport: field === 'file' || field === 'photos' ? null : current.photoReport,
+      importItems: field === 'file' || field === 'photos' ? [] : current.importItems,
       importStats: field === 'file' || field === 'photos' ? null : current.importStats,
       resultMessage: field === 'file' || field === 'photos' ? '' : current.resultMessage,
     }))
@@ -1933,8 +2109,13 @@ function App() {
   async function handleSaveMember(event) {
     event.preventDefault()
 
-    if (!isSuperAdmin) {
-      setError('Only super admins can manage members.')
+    if (actionModal === 'editMember' && !isSuperAdmin) {
+      setError('Only super admins can edit members.')
+      return
+    }
+
+    if (actionModal !== 'editMember' && !canManageMembers) {
+      setError('Only admins can create members.')
       return
     }
 
@@ -2032,8 +2213,8 @@ function App() {
   async function handleSaveRegionClub(event) {
     event.preventDefault()
 
-    if (!isSuperAdmin) {
-      setError('Only super admins can manage members.')
+    if (!canManageRegionClubs) {
+      setError('Only admins can manage region and club setup.')
       return
     }
 
@@ -2056,6 +2237,21 @@ function App() {
       let createdGovernor = false
       let regionId = selectedRegionId
       let normalizedRegionName = regionName
+
+      if (!isSuperAdmin && selectedGovernor === '__NEW__') {
+        setError('Only super admins can add governors. Please choose an existing governor and region.')
+        return
+      }
+
+      if (!isSuperAdmin && renameExistingRegion) {
+        setError('Only super admins can rename regions.')
+        return
+      }
+
+      if (!isSuperAdmin && regionId <= 0) {
+        setError('Please choose an existing region before adding a club.')
+        return
+      }
 
       if (selectedGovernor === '__NEW__') {
         if (newGovernorName === '') {
@@ -2839,8 +3035,8 @@ function App() {
   async function handleImportMembers(event) {
     event.preventDefault()
 
-    if (!isSuperAdmin) {
-      setError('Only super admins can import members.')
+    if (!canManageMembers) {
+      setError('Only admins can import members.')
       return
     }
 
@@ -2858,11 +3054,11 @@ function App() {
 
       const photos = memberImportForm.photos || []
       setActionProgress((current) => (
-        current ? { ...current, label: photos.length > 0 ? 'Compressing photos before upload...' : 'Preparing CSV upload...' } : current
+        current ? { ...current, label: photos.length > 0 ? 'Preparing member images...' : 'Preparing CSV upload...' } : current
       ))
       const optimizedPhotos = await optimizeMemberImportPhotos(photos)
       setActionProgress((current) => (
-        current ? { ...current, label: 'Uploading CSV and photos...' } : current
+        current ? { ...current, label: 'Uploading files...' } : current
       ))
 
       const formData = new FormData()
@@ -2879,6 +3075,7 @@ function App() {
       })
       await finishActionProgress(progressStartedAt, 'CSV import processed.')
       const duplicates = Array.isArray(payload?.data?.duplicates) ? payload.data.duplicates : []
+      const importItems = Array.isArray(payload?.data?.items) ? payload.data.items : []
       const photoReport = {
         attached: Number(payload?.data?.photosAttached || 0) || 0,
         missing: Array.isArray(payload?.data?.missingPhotos) ? payload.data.missingPhotos : [],
@@ -2893,6 +3090,7 @@ function App() {
         ...current,
         duplicates,
         photoReport,
+        importItems,
         importStats: {
           created: Number(payload?.data?.created || 0) || 0,
           updated: Number(payload?.data?.updated || 0) || 0,
@@ -2917,8 +3115,6 @@ function App() {
 
       setActivePage('members')
       setNotice(payload?.message || 'Members imported successfully.')
-      closeActionModal(true)
-      resetMemberImportForm()
     } catch (importError) {
       clearActionProgress()
       setError(importError.message || 'Unable to import the CSV file.')
@@ -3230,7 +3426,13 @@ function App() {
 
   function renderProcessingBackdrop() {
     const progressValue = Math.round(actionProgress?.value || 0)
-    const progressLabel = actionProgress?.label || 'Processing request...'
+    const showUploadingPhotos = actionModal === 'memberImport'
+      && Array.isArray(memberImportForm.photos)
+      && memberImportForm.photos.length > 0
+    const liveUploadLabel = actionModal === 'memberImport'
+      ? currentUploadLabel(memberImportForm.file, memberImportForm.photos, uploadLabelTick)
+      : ''
+    const progressLabel = liveUploadLabel || actionProgress?.label || 'Processing request...'
 
     return (
       <Backdrop
@@ -3253,7 +3455,7 @@ function App() {
             border: '1px solid rgba(255, 255, 255, 0.22)',
             background: 'linear-gradient(135deg, rgba(17, 40, 74, 0.95), rgba(10, 22, 43, 0.9))',
             boxShadow: '0 18px 44px rgba(0, 0, 0, 0.35)',
-            width: 'min(460px, calc(100vw - 32px))',
+            width: 'min(620px, calc(100vw - 32px))',
           }}
         >
           <CircularProgress color="inherit" size={42} thickness={4.4} />
@@ -3270,10 +3472,12 @@ function App() {
               </div>
               <div className="admin-processing-progress__steps" aria-hidden="true">
                 <span>0%</span>
-                <span>50%</span>
                 <span>100%</span>
               </div>
             </div>
+          ) : null}
+          {showUploadingPhotos ? (
+            <UploadingPhotoPreview file={memberImportForm.file} photos={memberImportForm.photos} />
           ) : null}
         </Box>
       </Backdrop>
@@ -3402,6 +3606,7 @@ function App() {
             query={query}
             loading={pageLoading}
             isSuperAdmin={isSuperAdmin}
+            canManageMembers={canManageMembers}
             onCreateMember={() => openActionModal('member')}
             onImportMembers={() => openActionModal('memberImport')}
             onEditMember={openMemberEditor}
@@ -3515,6 +3720,7 @@ function App() {
             query={query}
             loading={pageLoading}
             isSuperAdmin={isSuperAdmin}
+            canManageRegionClubs={canManageRegionClubs}
             onCreateRegionClub={() => openActionModal('regionClub')}
             onEditGovernor={openGovernorEditor}
             onDeleteGovernor={handleDeleteGovernor}
@@ -3876,6 +4082,8 @@ function App() {
         regionClubMap={regionClubMap}
         governors={collections.governors}
         isSuperAdmin={isSuperAdmin}
+        canManageMembers={canManageMembers}
+        canManageRegionClubs={canManageRegionClubs}
       />
     </div>
   )
