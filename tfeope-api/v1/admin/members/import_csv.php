@@ -162,6 +162,7 @@ try {
     $photoAttached = 0;
     $duplicates = [];
     $missingPhotos = [];
+    $existingPhotos = [];
     $photoErrors = [];
     $importItems = [];
     $matchedPhotoKeys = [];
@@ -223,7 +224,7 @@ try {
         $seenMemberIds[$memberId] = true;
 
         $existing = api_fetch_one($db, '
-            SELECT eagles_id
+            SELECT eagles_id, eagles_pic
             FROM user_info
             WHERE eagles_id = :eagles_id
             LIMIT 1
@@ -236,6 +237,7 @@ try {
 
             if ($existing !== null && is_array($photoUpload) && !isset($matchedPhotoKeys[$photoKey])) {
                 try {
+                    $currentPhoto = basename(trim((string) ($existing['eagles_pic'] ?? '')));
                     $storedPhoto = api_store_uploaded_file_as($photoUpload, 'members', $memberId, api_image_extensions(), true);
                     api_execute($db, '
                         UPDATE user_info
@@ -250,6 +252,16 @@ try {
                     $photoStatus = 'attached_to_existing';
                     $photoFile = (string) ($storedPhoto['filename'] ?? $photoFile);
                     $photoReason = 'Photo attached to existing member.';
+
+                    if ($currentPhoto !== '') {
+                        $existingPhotos[] = [
+                            'row' => $rowNumber,
+                            'id' => $memberId,
+                            'file' => (string) ($photoUpload['name'] ?? ''),
+                            'currentFile' => $currentPhoto,
+                            'reason' => 'Member already had an existing photo; uploaded photo replaced it.',
+                        ];
+                    }
                 } catch (Throwable $photoError) {
                     $photoStatus = 'error';
                     $photoReason = $photoError->getMessage();
@@ -382,10 +394,32 @@ try {
             continue;
         }
 
+        $existingPhotoMember = api_fetch_one($db, '
+            SELECT eagles_id, eagles_pic
+            FROM user_info
+            WHERE eagles_id = :eagles_id
+            LIMIT 1
+        ', [':eagles_id' => $key]);
+
+        if ($existingPhotoMember !== null) {
+            $currentPhoto = basename(trim((string) ($existingPhotoMember['eagles_pic'] ?? '')));
+            $existingPhotos[] = [
+                'row' => null,
+                'id' => (string) ($existingPhotoMember['eagles_id'] ?? $key),
+                'file' => (string) ($photo['name'] ?? ''),
+                'currentFile' => $currentPhoto,
+                'reason' => $currentPhoto !== ''
+                    ? 'Member ID already exists and already has a photo.'
+                    : 'Member ID already exists.',
+            ];
+        }
+
         $unmatchedPhotos[] = [
             'file' => (string) ($photo['name'] ?? ''),
             'expectedId' => $key,
-            'reason' => 'No CSV/member ID matched this image filename.',
+            'reason' => $existingPhotoMember !== null
+                ? 'Image filename matches an existing member ID, but no CSV row was imported for it.'
+                : 'No CSV/member ID matched this image filename.',
         ];
     }
 
@@ -422,6 +456,7 @@ try {
             'duplicates' => $duplicates,
             'duplicateCount' => count($duplicates),
             'missingPhotos' => $missingPhotos,
+            'existingPhotos' => $existingPhotos,
             'unmatchedPhotos' => $unmatchedPhotos,
             'invalidPhotos' => $invalidPhotos,
             'photoErrors' => $photoErrors,

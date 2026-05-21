@@ -271,29 +271,20 @@ function MemberPreview({ memberForm, isEditingMember }) {
 
 function CsvTemplateNote({ file }) {
   return (
-    <>
-      <div className="admin-modal-note">
-        <span>Required CSV layout</span>
-        <small>
-          Use this exact header structure from your sample file:
-          {' '}
-          `ID, First Name, Last Name, Position, Club, Region, Status`
-        </small>
-      </div>
-
-      <div className="csv-template-preview">
-        <span className="csv-template-preview__label">Header preview</span>
-        <code>ID,First Name,Last Name,Position,Club,Region,Status</code>
-        <small>
-          Duplicate member IDs are skipped. Optional photos must use the member ID as filename.
-        </small>
-        {file ? <strong>Selected file: {file.name}</strong> : null}
-      </div>
-    </>
+    <div className="csv-template-preview">
+      <span className="csv-template-preview__label">Required CSV layout</span>
+      <code>ID,First Name,Last Name,Position,Club,Region,Status</code>
+      <small>
+        Duplicate member IDs are skipped. Optional photos must use the member ID as filename.
+      </small>
+      {file ? <strong>Selected file: {file.name}</strong> : null}
+    </div>
   )
 }
 
 function CsvDuplicateTable({ duplicates = [], message = '' }) {
+  const [open, setOpen] = useState(false)
+
   if (!Array.isArray(duplicates) || duplicates.length === 0) {
     return null
   }
@@ -303,45 +294,54 @@ function CsvDuplicateTable({ duplicates = [], message = '' }) {
       <div className="csv-duplicate-panel__header">
         <span>
           <i className="fas fa-triangle-exclamation" aria-hidden="true"></i>
-          Duplicate IDs skipped
+          {duplicates.length} duplicate ID{duplicates.length === 1 ? '' : 's'} skipped
         </span>
         {message ? <small>{message}</small> : null}
+        <button type="button" className="csv-panel-toggle" onClick={() => setOpen((current) => !current)}>
+          <i className={`fas ${open ? 'fa-eye-slash' : 'fa-eye'}`} aria-hidden="true"></i>
+          {open ? 'Hide duplicate details' : 'Show duplicate details'}
+        </button>
       </div>
 
-      <div className="csv-duplicate-table-wrap">
-        <table className="csv-duplicate-table">
-          <thead>
-            <tr>
-              <th>Row</th>
-              <th>Eagles ID</th>
-              <th>Name</th>
-              <th>Club</th>
-              <th>Reason</th>
-            </tr>
-          </thead>
-          <tbody>
-            {duplicates.map((duplicate, index) => (
-              <tr key={`${duplicate.id || 'duplicate'}-${duplicate.row || index}`}>
-                <td>{duplicate.row || '-'}</td>
-                <td>{duplicate.id || '-'}</td>
-                <td>{duplicate.name || '-'}</td>
-                <td>{duplicate.club || '-'}</td>
-                <td>{duplicate.reason || 'Duplicate member ID.'}</td>
+      {open ? (
+        <div className="csv-duplicate-table-wrap">
+          <table className="csv-duplicate-table">
+            <thead>
+              <tr>
+                <th>Row</th>
+                <th>Eagles ID</th>
+                <th>Name</th>
+                <th>Club</th>
+                <th>Reason</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {duplicates.map((duplicate, index) => (
+                <tr key={`${duplicate.id || 'duplicate'}-${duplicate.row || index}`}>
+                  <td>{duplicate.row || '-'}</td>
+                  <td>{duplicate.id || '-'}</td>
+                  <td>{duplicate.name || '-'}</td>
+                  <td>{duplicate.club || '-'}</td>
+                  <td>{duplicate.reason || 'Duplicate member ID.'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
     </div>
   )
 }
 
 function CsvPhotoReport({ report = null }) {
+  const [open, setOpen] = useState(false)
+
   if (!report) {
     return null
   }
 
   const missing = Array.isArray(report.missing) ? report.missing : []
+  const existing = Array.isArray(report.existing) ? report.existing : []
   const unmatched = Array.isArray(report.unmatched) ? report.unmatched : []
   const invalid = Array.isArray(report.invalid) ? report.invalid : []
   const errors = Array.isArray(report.errors) ? report.errors : []
@@ -351,6 +351,14 @@ function CsvPhotoReport({ report = null }) {
       id: item.id || '-',
       file: '-',
       reason: 'No matching photo uploaded.',
+    })),
+    ...existing.map((item) => ({
+      type: 'Existing',
+      id: item.id || '-',
+      file: item.currentFile
+        ? `${item.file || '-'} / current: ${item.currentFile}`
+        : item.file || '-',
+      reason: item.reason || 'Member already has an existing photo.',
     })),
     ...unmatched.map((item) => ({
       type: 'Unmatched',
@@ -379,10 +387,16 @@ function CsvPhotoReport({ report = null }) {
           <i className="fas fa-images" aria-hidden="true"></i>
           Photo matching report
         </span>
-        <small>{report.attached || 0} photo(s) attached. Import continues even when photos need review.</small>
+        <small>{report.attached || 0} photo(s) attached, {reviewItems.length} review item(s). Import continues even when photos need review.</small>
+        {reviewItems.length > 0 ? (
+          <button type="button" className="csv-panel-toggle" onClick={() => setOpen((current) => !current)}>
+            <i className={`fas ${open ? 'fa-eye-slash' : 'fa-eye'}`} aria-hidden="true"></i>
+            {open ? 'Hide photo details' : 'Show photo details'}
+          </button>
+        ) : null}
       </div>
 
-      {reviewItems.length > 0 ? (
+      {reviewItems.length > 0 && open ? (
         <div className="csv-duplicate-table-wrap">
           <table className="csv-duplicate-table">
             <thead>
@@ -405,9 +419,9 @@ function CsvPhotoReport({ report = null }) {
             </tbody>
           </table>
         </div>
-      ) : (
+      ) : reviewItems.length === 0 ? (
         <small>All uploaded photos matched successfully.</small>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -469,6 +483,17 @@ function normalizeCsvHeader(header) {
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+function normalizeMemberImportPhotoKey(value) {
+  const filename = String(value || '').split(/[\\/]/).pop() || ''
+  const baseName = filename.replace(/\.[^.]*$/, '')
+
+  return baseName
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
 }
 
@@ -618,6 +643,7 @@ function CsvUploadTracker({
   submitting = false,
   stats = null,
   items = [],
+  members = [],
 }) {
   const [open, setOpen] = useState(true)
   const [previewRows, setPreviewRows] = useState([])
@@ -690,7 +716,46 @@ function CsvUploadTracker({
   const resultItems = Array.isArray(items) ? items : []
   const photoItems = Array.isArray(photos) ? photos : []
   const hasResults = resultItems.length > 0 || stats
-  const rowsToShow = hasResults ? resultItems : previewRows
+  const existingMembersById = new Map(
+    (Array.isArray(members) ? members : [])
+      .map((member) => {
+        const id = String(member?.id || member?.eagles_id || '').trim().toUpperCase()
+        return id ? [id, member] : null
+      })
+      .filter(Boolean),
+  )
+  const photoKeyCounts = photoItems.reduce((counts, photo) => {
+    const key = normalizeMemberImportPhotoKey(photo?.name)
+    if (key) {
+      counts.set(key, (counts.get(key) || 0) + 1)
+    }
+    return counts
+  }, new Map())
+  const rowsToShow = hasResults
+    ? resultItems
+    : previewRows.map((row) => {
+      const id = String(row?.id || '').trim().toUpperCase()
+      const photoKey = normalizeMemberImportPhotoKey(id)
+      const existingMember = id ? existingMembersById.get(id) : null
+      const currentPhoto = String(
+        existingMember?.photoFilename
+        || existingMember?.eagles_pic
+        || existingMember?.photo
+        || '',
+      ).trim()
+      const selectedPhotoCount = photoKey ? (photoKeyCounts.get(photoKey) || 0) : 0
+      const photoStatus = selectedPhotoCount > 1
+        ? 'duplicate_photo'
+        : selectedPhotoCount > 0
+          ? currentPhoto ? 'existing_photo' : 'matched'
+          : currentPhoto ? 'existing_photo' : 'missing'
+
+      return {
+        ...row,
+        status: existingMember ? 'duplicate' : 'ready',
+        photoStatus,
+      }
+    })
   const createdCount = Number(stats?.created || 0) || 0
   const skippedCount = Number(stats?.skipped || 0) || 0
   const photoCount = Number(stats?.photosAttached || 0) || 0
@@ -800,18 +865,21 @@ function CsvUploadTracker({
 }
 
 function CsvImportReport({ stats = null, duplicates = [], photoReport = null, message = '' }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
 
   if (!stats && !photoReport && (!Array.isArray(duplicates) || duplicates.length === 0)) {
     return null
   }
 
   const missing = Array.isArray(photoReport?.missing) ? photoReport.missing : []
+  const existing = Array.isArray(photoReport?.existing) ? photoReport.existing : []
   const unmatched = Array.isArray(photoReport?.unmatched) ? photoReport.unmatched : []
   const invalid = Array.isArray(photoReport?.invalid) ? photoReport.invalid : []
   const errors = Array.isArray(photoReport?.errors) ? photoReport.errors : []
   const duplicateCount = Array.isArray(duplicates) ? duplicates.length : 0
-  const reviewCount = duplicateCount + missing.length + unmatched.length + invalid.length + errors.length
+  const reviewCount = duplicateCount + missing.length + existing.length + unmatched.length + invalid.length + errors.length
+  const selectedPhotoCount = Number(stats?.selectedPhotoCount || 0) || 0
+  const existingPhotoCount = Number(stats?.existingPhotoCount || existing.length) || 0
   return (
     <div className="csv-import-report">
       <button type="button" className="csv-import-report__toggle" onClick={() => setOpen((current) => !current)}>
@@ -819,7 +887,7 @@ function CsvImportReport({ stats = null, duplicates = [], photoReport = null, me
           <i className={`fas ${open ? 'fa-eye-slash' : 'fa-eye'}`} aria-hidden="true"></i>
           {open ? 'Hide import report' : 'Show import report'}
         </span>
-        <strong>{stats?.created || 0} created · {stats?.photosAttached || 0} photos · {reviewCount} review</strong>
+        <strong>{stats?.created || 0} created | {duplicateCount} duplicate | {reviewCount} review</strong>
       </button>
 
       {open ? (
@@ -827,9 +895,12 @@ function CsvImportReport({ stats = null, duplicates = [], photoReport = null, me
           {message ? <p>{message}</p> : null}
           <div className="csv-import-report__stats">
             <span><strong>{stats?.created || 0}</strong>Created</span>
-            <span><strong>{stats?.updated || 0}</strong>Updated</span>
             <span><strong>{stats?.skipped || 0}</strong>Skipped</span>
-            <span><strong>{stats?.photosAttached || 0}</strong>Photos</span>
+            <span><strong>{duplicateCount}</strong>Duplicate</span>
+            <span><strong>{reviewCount}</strong>Review</span>
+            <span><strong>{stats?.photosAttached || 0}</strong>Attached</span>
+            <span><strong>{existingPhotoCount}</strong>Existing Photos</span>
+            <span><strong>{selectedPhotoCount}</strong>Selected Photos</span>
           </div>
           <CsvDuplicateTable duplicates={duplicates} />
           <CsvPhotoReport report={photoReport} />
@@ -1696,7 +1767,7 @@ export default function ActionModal({
                         fontSize: '14px'
                       }}
                     >
-                      🔒
+                      Ã°Å¸â€â€™
                     </span>
                   </div>
                 </Field> */}
@@ -1863,13 +1934,10 @@ export default function ActionModal({
                   >
                     <input
                       type="file"
-                      accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.jfif,image/*"
+                      accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.jfif"
                       multiple
                       onChange={(event) => onMemberImportFieldChange('photos', Array.from(event.target.files || []))}
                     />
-                    {memberImportForm?.photos?.length ? (
-                      <small>{memberImportForm.photos.length} photo file(s) selected.</small>
-                    ) : null}
                   </Field>
                 </div>
 

@@ -331,6 +331,151 @@ async function optimizeMemberImportPhotos(files = []) {
   return optimized
 }
 
+function isMemberImportImageFile(file) {
+  if (!(file instanceof File)) {
+    return false
+  }
+
+  const type = String(file.type || '').toLowerCase()
+  const extension = String(file.name || '').split('.').pop()?.toLowerCase() || ''
+
+  return type.startsWith('image/')
+    || ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'jfif'].includes(extension)
+}
+
+function parseMemberImportCsvPreview(text) {
+  const rows = []
+  let current = []
+  let value = ''
+  let quoted = false
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index]
+    const next = text[index + 1]
+
+    if (char === '"' && quoted && next === '"') {
+      value += '"'
+      index += 1
+      continue
+    }
+
+    if (char === '"') {
+      quoted = !quoted
+      continue
+    }
+
+    if (char === ',' && !quoted) {
+      current.push(value.trim())
+      value = ''
+      continue
+    }
+
+    if ((char === '\n' || char === '\r') && !quoted) {
+      if (char === '\r' && next === '\n') {
+        index += 1
+      }
+      current.push(value.trim())
+      if (current.some((cell) => cell !== '')) {
+        rows.push(current)
+      }
+      current = []
+      value = ''
+      continue
+    }
+
+    value += char
+  }
+
+  current.push(value.trim())
+  if (current.some((cell) => cell !== '')) {
+    rows.push(current)
+  }
+
+  return rows
+}
+
+function normalizeMemberImportHeader(header) {
+  return String(header || '')
+    .replace(/^\uFEFF/, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+function normalizeMemberImportPhotoKey(value) {
+  const filename = String(value || '').split(/[\\/]/).pop() || ''
+  const baseName = filename.replace(/\.[^.]*$/, '')
+
+  return baseName
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
+async function buildMemberImportLocalReview(file, photos = [], members = []) {
+  const membersById = new Map(
+    (Array.isArray(members) ? members : [])
+      .map((member) => {
+        const id = String(member?.id || member?.eagles_id || '').trim().toUpperCase()
+        return id ? [id, member] : null
+      })
+      .filter(Boolean),
+  )
+  const duplicates = []
+  const existingPhotos = []
+
+  if (file instanceof File) {
+    try {
+      const rows = parseMemberImportCsvPreview(await file.text())
+      const headerMap = Object.fromEntries(
+        (rows[0] || []).map((entry, index) => [normalizeMemberImportHeader(entry), index]),
+      )
+
+      rows.slice(1).forEach((row, index) => {
+        const id = String(row[headerMap.id] || '').trim().toUpperCase()
+        if (!id || !membersById.has(id)) {
+          return
+        }
+
+        const member = membersById.get(id)
+        const name = String(member?.fullName || member?.name || `${member?.firstName || ''} ${member?.lastName || ''}`).trim()
+        duplicates.push({
+          row: index + 2,
+          id,
+          name,
+          club: member?.club || member?.eagles_club || '-',
+          reason: 'ID already exists in members.',
+        })
+      })
+    } catch {
+      // The API still validates the CSV; this local pass is only for the visible import report.
+    }
+  }
+
+  ;(Array.isArray(photos) ? photos : []).forEach((photo) => {
+    const id = normalizeMemberImportPhotoKey(photo?.name)
+    const member = id ? membersById.get(id) : null
+    if (!member) {
+      return
+    }
+
+    const currentPhoto = String(member?.photoFilename || member?.eagles_pic || member?.photo || '').trim()
+    existingPhotos.push({
+      row: null,
+      id,
+      file: photo.name,
+      currentFile: currentPhoto,
+      reason: currentPhoto
+        ? 'Member ID already exists and already has a photo.'
+        : 'Member ID already exists.',
+    })
+  })
+
+  return { duplicates, existingPhotos }
+}
+
 function normalizeAppointedForAdmin(items = []) {
   if (!Array.isArray(items)) {
     return []
@@ -562,19 +707,63 @@ function formatUploadSize(bytes) {
   return `${Math.max(1, Math.round(size / 1024))} Kb`
 }
 
-function UploadingPhotoPreview({ file = null, photos = [] }) {
+function formatEta(totalItems, progressValue, startedAt) {
+  const total = Number(totalItems || 0) || 0
+  const progress = Math.max(0, Math.min(100, Number(progressValue || 0) || 0))
+
+  if (total <= 0 || progress <= 0 || !startedAt) {
+    return 'Calculating time...'
+  }
+
+  if (progress >= 90 && progress < 100) {
+    return 'Finalizing upload...'
+  }
+
+  const elapsedSeconds = Math.max(1, (Date.now() - startedAt) / 1000)
+  const totalEstimatedSeconds = elapsedSeconds / (progress / 100)
+  const remainingSeconds = Math.max(0, Math.round(totalEstimatedSeconds - elapsedSeconds))
+
+  if (remainingSeconds <= 0) {
+    return 'Finishing now'
+  }
+
+  if (remainingSeconds < 60) {
+    return `${remainingSeconds}s remaining`
+  }
+
+  const minutes = Math.ceil(remainingSeconds / 60)
+  return `${minutes} min remaining`
+}
+
+function uploadEaglesIdFromName(name) {
+  return String(name || '')
+    .replace(/\.[^.]+$/, '')
+    .trim()
+    .toUpperCase()
+}
+
+function UploadingPhotoPreview({ file = null, photos = [], progressValue = 0, startedAt = null }) {
   const [previews, setPreviews] = useState([])
   const [progressTick, setProgressTick] = useState(0)
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const imageFiles = (Array.isArray(photos) ? photos : [])
+    const allImageFiles = (Array.isArray(photos) ? photos : [])
       .filter((photo) => photo instanceof File && String(photo.type || '').startsWith('image/'))
-      .slice(0, 12)
+    const currentPhotoIndex = Math.max(0, Math.floor(progressTick / 2) - (file ? 1 : 0))
+    const previewMap = new Map()
 
-    const nextPreviews = imageFiles.map((photo) => ({
+    allImageFiles.slice(0, 6).forEach((photo) => {
+      previewMap.set(photo.name, photo)
+    })
+    allImageFiles.slice(Math.max(0, currentPhotoIndex - 3), currentPhotoIndex + 4).forEach((photo) => {
+      previewMap.set(photo.name, photo)
+    })
+
+    const nextPreviews = Array.from(previewMap.values()).map((photo) => ({
       name: photo.name,
       size: photo.size,
+      processing: allImageFiles[currentPhotoIndex]?.name === photo.name,
       url: URL.createObjectURL(photo),
     }))
 
@@ -583,13 +772,15 @@ function UploadingPhotoPreview({ file = null, photos = [] }) {
     return () => {
       nextPreviews.forEach((preview) => URL.revokeObjectURL(preview.url))
     }
-  }, [photos])
+  }, [file, photos, progressTick])
 
   useEffect(() => {
     setProgressTick(0)
+    const totalItems = (file ? 1 : 0) + (Array.isArray(photos) ? photos.length : 0)
+    const maxTick = Math.max(18, totalItems * 2)
 
     const timer = window.setInterval(() => {
-      setProgressTick((current) => Math.min(18, current + 1))
+      setProgressTick((current) => Math.min(maxTick, current + 1))
     }, 360)
 
     return () => window.clearInterval(timer)
@@ -601,6 +792,12 @@ function UploadingPhotoPreview({ file = null, photos = [] }) {
     }
   }
 
+  const totalUploadCount = (file ? 1 : 0) + (Array.isArray(photos) ? photos.length : 0)
+  const normalizedProgress = Math.max(0, Math.min(100, Number(progressValue || 0) || 0))
+  const currentUploadCount = totalUploadCount > 0
+    ? Math.min(totalUploadCount, Math.max(1, Math.floor(progressTick / 2) + 1))
+    : 0
+  const etaLabel = formatEta(totalUploadCount, normalizedProgress, startedAt)
   const hiddenCount = Math.max(0, (Array.isArray(photos) ? photos.length : 0) - previews.length)
   const queueItems = [
     file ? {
@@ -618,6 +815,7 @@ function UploadingPhotoPreview({ file = null, photos = [] }) {
       size: preview.size,
       image: preview.url,
       icon: 'fa-image',
+      processing: preview.processing,
       progress: Math.min(100, progressTick * (5 + (index % 3)) + index * 3),
       tone: index % 3 === 0 ? 'teal' : index % 3 === 1 ? 'gold' : 'blue',
     })),
@@ -629,6 +827,10 @@ function UploadingPhotoPreview({ file = null, photos = [] }) {
       status: item.progress >= 100 ? 'Complete' : 'Uploading',
     }))
     .sort((first, second) => {
+      if (first.processing !== second.processing) {
+        return first.processing ? -1 : 1
+      }
+
       if (first.complete !== second.complete) {
         return first.complete ? 1 : -1
       }
@@ -641,7 +843,8 @@ function UploadingPhotoPreview({ file = null, photos = [] }) {
       <div className="admin-uploading-photos__header">
         <span>Uploading files</span>
         <div className="admin-uploading-photos__header-actions">
-          <strong>{queueItems.length + hiddenCount}</strong>
+          <small>{etaLabel}</small>
+          <strong>{currentUploadCount}/{totalUploadCount}</strong>
           <button type="button" onClick={() => setVisible((current) => !current)}>
             {visible ? 'Hide' : 'Show'}
           </button>
@@ -658,6 +861,12 @@ function UploadingPhotoPreview({ file = null, photos = [] }) {
                 <div className="admin-uploading-file-row__topline">
                   <strong>{item.name}</strong>
                   <small>{item.progress}%</small>
+                </div>
+                <div className="admin-uploading-file-row__id">
+                  <span>
+                    {item.processing ? 'Processing now - ' : ''}
+                    {item.image ? `ID: ${uploadEaglesIdFromName(item.name)}` : 'CSV member list'}
+                  </span>
                 </div>
                 <div className="admin-uploading-file-row__track" aria-hidden="true">
                   <span className={`tone-${item.tone}`} style={{ width: `${item.progress}%` }}></span>
@@ -1431,7 +1640,7 @@ function App() {
     const timer = window.setInterval(() => {
       setActionProgress((current) => {
         if (!current?.active) return current
-        const nextValue = Math.min(88, current.value + (current.value < 50 ? 4 : 2))
+        const nextValue = Math.min(99, current.value + (current.value < 50 ? 4 : current.value < 90 ? 2 : 1))
         return { ...current, value: nextValue }
       })
     }, 520)
@@ -1457,6 +1666,7 @@ function App() {
       active: true,
       value: 0,
       label,
+      startedAt: Date.now(),
     })
 
     return Date.now()
@@ -1472,6 +1682,7 @@ function App() {
       active: false,
       value: 100,
       label,
+      startedAt,
     })
 
     window.setTimeout(() => {
@@ -1986,9 +2197,17 @@ function App() {
   }
 
   function updateMemberImportForm(field, value) {
+    const nextValue = field === 'photos' && Array.isArray(value)
+      ? value.filter(isMemberImportImageFile)
+      : value
+
+    if (field === 'photos' && Array.isArray(value) && nextValue.length !== value.length) {
+      setError('Member photos only accepts image files. Non-image files were removed.')
+    }
+
     setMemberImportForm((current) => ({
       ...current,
-      [field]: value,
+      [field]: nextValue,
       duplicates: field === 'file' || field === 'photos' ? [] : current.duplicates,
       photoReport: field === 'file' || field === 'photos' ? null : current.photoReport,
       importItems: field === 'file' || field === 'photos' ? [] : current.importItems,
@@ -3056,6 +3275,7 @@ function App() {
       setActionProgress((current) => (
         current ? { ...current, label: photos.length > 0 ? 'Preparing member images...' : 'Preparing CSV upload...' } : current
       ))
+      const localReview = await buildMemberImportLocalReview(memberImportForm.file, photos, collections.members)
       const optimizedPhotos = await optimizeMemberImportPhotos(photos)
       setActionProgress((current) => (
         current ? { ...current, label: 'Uploading files...' } : current
@@ -3074,11 +3294,28 @@ function App() {
         body: formData,
       })
       await finishActionProgress(progressStartedAt, 'CSV import processed.')
-      const duplicates = Array.isArray(payload?.data?.duplicates) ? payload.data.duplicates : []
+      const apiDuplicates = Array.isArray(payload?.data?.duplicates) ? payload.data.duplicates : []
+      const localDuplicates = Array.isArray(localReview?.duplicates) ? localReview.duplicates : []
+      const duplicates = [
+        ...apiDuplicates,
+        ...localDuplicates.filter((localItem) => !apiDuplicates.some((apiItem) => (
+          String(apiItem?.id || '').trim().toUpperCase() === String(localItem?.id || '').trim().toUpperCase()
+        ))),
+      ]
       const importItems = Array.isArray(payload?.data?.items) ? payload.data.items : []
+      const apiExistingPhotos = Array.isArray(payload?.data?.existingPhotos) ? payload.data.existingPhotos : []
+      const localExistingPhotos = Array.isArray(localReview?.existingPhotos) ? localReview.existingPhotos : []
+      const existingPhotos = [
+        ...apiExistingPhotos,
+        ...localExistingPhotos.filter((localItem) => !apiExistingPhotos.some((apiItem) => (
+          String(apiItem?.id || '').trim().toUpperCase() === String(localItem?.id || '').trim().toUpperCase()
+          && String(apiItem?.file || '').trim() === String(localItem?.file || '').trim()
+        ))),
+      ]
       const photoReport = {
         attached: Number(payload?.data?.photosAttached || 0) || 0,
         missing: Array.isArray(payload?.data?.missingPhotos) ? payload.data.missingPhotos : [],
+        existing: existingPhotos,
         unmatched: Array.isArray(payload?.data?.unmatchedPhotos) ? payload.data.unmatchedPhotos : [],
         invalid: Array.isArray(payload?.data?.invalidPhotos) ? payload.data.invalidPhotos : [],
         errors: Array.isArray(payload?.data?.photoErrors) ? payload.data.photoErrors : [],
@@ -3096,6 +3333,14 @@ function App() {
           updated: Number(payload?.data?.updated || 0) || 0,
           skipped: Number(payload?.data?.skipped || 0) || 0,
           duplicateCount: Number(payload?.data?.duplicateCount || duplicates.length) || 0,
+          reviewCount: duplicates.length
+            + photoReport.missing.length
+            + photoReport.existing.length
+            + photoReport.unmatched.length
+            + photoReport.invalid.length
+            + photoReport.errors.length,
+          existingPhotoCount: photoReport.existing.length,
+          selectedPhotoCount: photos.length,
           photosAttached: photoReport.attached,
         },
         resultMessage: payload?.message || '',
@@ -3104,6 +3349,7 @@ function App() {
       if (
         duplicates.length > 0
         || photoReport.missing.length > 0
+        || photoReport.existing.length > 0
         || photoReport.unmatched.length > 0
         || photoReport.invalid.length > 0
         || photoReport.errors.length > 0
@@ -3464,20 +3710,20 @@ function App() {
           {actionProgress ? (
             <div className="admin-processing-progress" role="status" aria-live="polite">
               <div className="admin-processing-progress__header">
-                <span>Progress</span>
                 <strong>{progressValue}%</strong>
               </div>
               <div className="admin-processing-progress__track" aria-hidden="true">
                 <span style={{ width: `${Math.max(0, Math.min(100, progressValue))}%` }}></span>
               </div>
-              <div className="admin-processing-progress__steps" aria-hidden="true">
-                <span>0%</span>
-                <span>100%</span>
-              </div>
             </div>
           ) : null}
           {showUploadingPhotos ? (
-            <UploadingPhotoPreview file={memberImportForm.file} photos={memberImportForm.photos} />
+            <UploadingPhotoPreview
+              file={memberImportForm.file}
+              photos={memberImportForm.photos}
+              progressValue={progressValue}
+              startedAt={actionProgress?.startedAt || null}
+            />
           ) : null}
         </Box>
       </Backdrop>

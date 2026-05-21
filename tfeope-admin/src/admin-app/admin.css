@@ -1644,6 +1644,15 @@
   gap: 8px;
 }
 
+.admin-uploading-photos__header-actions small {
+  color: rgba(245, 248, 255, 0.76);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+}
+
 .admin-uploading-photos__header strong {
   display: inline-grid;
   place-items: center;
@@ -1773,6 +1782,20 @@
   overflow: hidden;
   color: #111827;
   font-size: 15px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-uploading-file-row__id {
+  min-width: 0;
+}
+
+.admin-uploading-file-row__id span {
+  display: block;
+  overflow: hidden;
+  color: #6b7280;
+  font-size: 11px;
   font-weight: 900;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1993,6 +2016,27 @@
 .csv-success-panel > small {
   color: var(--admin-muted);
   line-height: 1.5;
+}
+
+.csv-panel-toggle {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 1px solid rgba(16, 40, 74, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--admin-navy);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.csv-panel-toggle:hover {
+  border-color: rgba(16, 40, 74, 0.28);
+  background: #fff;
 }
 
 .csv-success-list {
