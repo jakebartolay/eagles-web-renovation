@@ -11,13 +11,6 @@ try {
     $db = api_db();
     $admin = api_require_admin($db);
 
-    if ((int) ($admin['role_id'] ?? 0) !== 1) {
-        api_json([
-            'ok' => false,
-            'message' => 'Only super admins can edit members.',
-        ], 403);
-    }
-
     $payload = api_request_data();
     $memberId = trim((string) ($payload['id'] ?? $payload['eagles_id'] ?? ''));
 
