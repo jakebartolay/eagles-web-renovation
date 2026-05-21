@@ -16,6 +16,10 @@ if (!function_exists('api_start')) {
         $started = true;
 
         api_apply_cors_headers();
+        header_remove('X-Powered-By');
+        header('X-Content-Type-Options: nosniff');
+        header('Referrer-Policy: no-referrer');
+        header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
 
         if (api_request_method() === 'OPTIONS') {
             http_response_code(204);

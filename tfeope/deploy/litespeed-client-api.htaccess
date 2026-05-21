@@ -1,0 +1,12 @@
+# Use this only if your hosting runs LiteSpeed/Apache and proxy rewrites are enabled.
+# Put this near the top of the .htaccess for EACH domain document root:
+# - tfoepe-inc.com.ph
+# - www.tfoepe-inc.com.ph
+# - admin.tfoepe-inc.com.ph
+#
+# If your host disables proxy rewrites, ask support to enable reverse proxying
+# or configure it from the LiteSpeed/OpenLiteSpeed vhost instead.
+
+RewriteEngine On
+
+RewriteRule ^client-api/(.*)$ https://api.tfoepe-inc.com.ph/$1 [P,L,QSA]

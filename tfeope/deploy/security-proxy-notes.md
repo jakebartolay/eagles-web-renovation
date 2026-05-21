@@ -3,6 +3,7 @@
 ## NGINX
 
 Place `nginx-client-api.conf` inside the HTTPS `server` block for `tfoepe-inc.com.ph`.
+Also add it to the `www.tfoepe-inc.com.ph` server block if visitors use the `www` hostname.
 If the admin app also uses `/client-api`, place the same `location` block inside the HTTPS `server` block for `admin.tfoepe-inc.com.ph`.
 
 After editing NGINX:
@@ -11,6 +12,18 @@ After editing NGINX:
 sudo nginx -t
 sudo systemctl reload nginx
 ```
+
+## LiteSpeed / Apache
+
+The current production server identifies as LiteSpeed. If NGINX is not actually in front of the sites, the NGINX `location` block will not run.
+
+If proxy rewrites are enabled, place the rules from `litespeed-client-api.htaccess` near the top of the `.htaccess` file in each document root:
+
+- `tfoepe-inc.com.ph`
+- `www.tfoepe-inc.com.ph`
+- `admin.tfoepe-inc.com.ph`
+
+If `[P]` proxy rewrites are disabled by hosting, ask the host to enable reverse proxying or configure a LiteSpeed/OpenLiteSpeed proxy context for `/client-api/` to `https://api.tfoepe-inc.com.ph/`.
 
 ## Security Checklist
 
@@ -33,6 +46,8 @@ sudo systemctl reload nginx
 
 ```bash
 curl -I https://tfoepe-inc.com.ph/client-api/api/public/home.php
+curl -I https://www.tfoepe-inc.com.ph/client-api/api/public/home.php
+curl -I https://admin.tfoepe-inc.com.ph/client-api/api/admin/session.php
 ```
 
 Expected: a normal API response status from the proxied backend, not an NGINX 404.
