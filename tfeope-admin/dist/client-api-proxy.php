@@ -4,6 +4,43 @@ declare(strict_types=1);
 
 const UPSTREAM_API_ORIGIN = 'https://api.tfoepe-inc.com.ph';
 
+function proxy_add_uploaded_files(array &$fields, array $files, string $prefix = ''): void
+{
+    foreach ($files as $key => $file) {
+        $fieldName = $prefix === '' ? (string) $key : $prefix . '[' . $key . ']';
+
+        if (is_array($file['name'] ?? null)) {
+            $count = count($file['name']);
+            for ($index = 0; $index < $count; $index += 1) {
+                $nested = [
+                    'name' => $file['name'][$index] ?? '',
+                    'type' => $file['type'][$index] ?? '',
+                    'tmp_name' => $file['tmp_name'][$index] ?? '',
+                    'error' => $file['error'][$index] ?? UPLOAD_ERR_NO_FILE,
+                    'size' => $file['size'][$index] ?? 0,
+                ];
+                proxy_add_uploaded_files($fields, [$index => $nested], $fieldName);
+            }
+            continue;
+        }
+
+        if ((int) ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+            continue;
+        }
+
+        $tmpName = (string) ($file['tmp_name'] ?? '');
+        if ($tmpName === '' || !is_uploaded_file($tmpName)) {
+            continue;
+        }
+
+        $fields[$fieldName] = curl_file_create(
+            $tmpName,
+            (string) ($file['type'] ?? 'application/octet-stream'),
+            (string) ($file['name'] ?? basename($tmpName))
+        );
+    }
+}
+
 $path = trim((string) ($_GET['__proxy_path'] ?? ''), '/');
 unset($_GET['__proxy_path']);
 
@@ -30,10 +67,11 @@ $query = http_build_query($_GET);
 $targetUrl = UPSTREAM_API_ORIGIN . '/' . $path . ($query !== '' ? '?' . $query : '');
 $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
 $requestBody = file_get_contents('php://input');
+$contentType = (string) ($_SERVER['CONTENT_TYPE'] ?? '');
+$isMultipart = stripos($contentType, 'multipart/form-data') !== false;
 
 $forwardHeaders = [];
-$contentType = (string) ($_SERVER['CONTENT_TYPE'] ?? '');
-if ($contentType !== '') {
+if ($contentType !== '' && !$isMultipart) {
     $forwardHeaders[] = 'Content-Type: ' . $contentType;
 }
 
@@ -80,7 +118,13 @@ if (function_exists('curl_init')) {
     ]);
 
     if (!in_array($method, ['GET', 'HEAD'], true)) {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, $requestBody === false ? '' : $requestBody);
+        if ($isMultipart) {
+            $multipartFields = $_POST;
+            proxy_add_uploaded_files($multipartFields, $_FILES);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $multipartFields);
+        } else {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $requestBody === false ? '' : $requestBody);
+        }
     }
 
     $responseBody = curl_exec($ch);
