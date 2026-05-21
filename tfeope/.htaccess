@@ -5,6 +5,9 @@ ErrorDocument 500 errors/500.html
 
 RewriteEngine On
 
+# Reverse proxy API calls before the app fallback.
+RewriteRule ^client-api/(.*)$ client-api-proxy.php?__proxy_path=$1 [L,QSA]
+
 # Serve existing files/directories directly, including dist assets.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
