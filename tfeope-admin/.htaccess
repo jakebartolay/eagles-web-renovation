@@ -5,6 +5,9 @@ ErrorDocument 500 errors/500.html
 
 RewriteEngine On
 
+# Reverse proxy API calls before the SPA fallback.
+RewriteRule ^client-api/(.*)$ https://api.tfoepe-inc.com.ph/$1 [P,L,QSA]
+
 # Serve existing files/directories directly (including dist assets).
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
