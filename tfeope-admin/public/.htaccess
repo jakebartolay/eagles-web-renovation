@@ -1,0 +1,14 @@
+DirectoryIndex index.html
+
+RewriteEngine On
+
+# Reverse proxy API calls before the SPA fallback.
+RewriteRule ^client-api/(.*)$ https://api.tfoepe-inc.com.ph/$1 [P,L,QSA]
+
+# Serve existing files/directories directly.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Fallback all other routes to Vite app.
+RewriteRule ^ index.html [L]

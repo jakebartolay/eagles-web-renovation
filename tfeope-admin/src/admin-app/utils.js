@@ -92,7 +92,14 @@ export function normalizeRequestError(error, fallbackMessage = 'Something went w
 
 export async function requestJson(input, init) {
   try {
-    const response = await fetch(input, init)
+    const response = await fetch(input, {
+      cache: 'no-store',
+      ...init,
+      headers: {
+        'Cache-Control': 'no-cache',
+        ...(init?.headers || {}),
+      },
+    })
     return await readJson(response)
   } catch (error) {
     throw normalizeRequestError(error)
@@ -104,5 +111,41 @@ export function normalizeDashboard(data) {
 }
 
 export function normalizeCollection(data) {
-  return data?.data || data || []
+  const candidate = data?.data ?? data
+
+  if (Array.isArray(candidate)) {
+    return candidate
+  }
+
+  if (!candidate || typeof candidate !== 'object') {
+    return []
+  }
+
+  const listKeys = [
+    'items',
+    'rows',
+    'records',
+    'members',
+    'users',
+    'news',
+    'videos',
+    'events',
+    'memorandums',
+    'memorandum',
+    'officers',
+    'governors',
+    'appointed',
+    'pastLeaders',
+    'past_leaders',
+    'magnaCarta',
+    'magna_carta',
+  ]
+
+  for (const key of listKeys) {
+    if (Array.isArray(candidate[key])) {
+      return candidate[key]
+    }
+  }
+
+  return []
 }
