@@ -7,6 +7,15 @@ const UPSTREAM_API_ORIGIN = 'https://api.tfoepe-inc.com.ph';
 $path = trim((string) ($_GET['__proxy_path'] ?? ''), '/');
 unset($_GET['__proxy_path']);
 
+if ($path === '') {
+    $requestPath = (string) parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+    $clientApiMarker = '/client-api/';
+    $markerPosition = strpos($requestPath, $clientApiMarker);
+    if ($markerPosition !== false) {
+        $path = trim(substr($requestPath, $markerPosition + strlen($clientApiMarker)), '/');
+    }
+}
+
 if ($path === '' || str_contains($path, '..')) {
     http_response_code(400);
     header('Content-Type: application/json; charset=utf-8');
