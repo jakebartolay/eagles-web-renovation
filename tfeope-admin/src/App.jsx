@@ -1928,6 +1928,9 @@ function App() {
 
     if (mode === 'member') {
       resetMemberComposer()
+      if (!loadedCollections.governors && !loadingCollections.governors) {
+        loadActiveCollectionEvent('governors')
+      }
     }
 
     if (mode === 'video') {
@@ -1944,6 +1947,9 @@ function App() {
 
     if (mode === 'regionClub') {
       resetRegionClubComposer()
+      if (!loadedCollections.governors && !loadingCollections.governors) {
+        loadActiveCollectionEvent('governors')
+      }
     }
 
     if (mode === 'editOfficer') {
@@ -4433,6 +4439,7 @@ function App() {
         regions={regions}
         regionClubMap={regionClubMap}
         governors={collections.governors}
+        regionCatalogLoading={Boolean(loadingCollections.governors)}
         isSuperAdmin={isSuperAdmin}
         canManageMembers={canManageMembers}
         canManageRegionClubs={canManageRegionClubs}

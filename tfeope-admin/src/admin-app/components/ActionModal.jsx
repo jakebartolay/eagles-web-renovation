@@ -993,6 +993,7 @@ export default function ActionModal({
   regions = [],
   regionClubMap = {},
   governors = [],
+  regionCatalogLoading = false,
   isSuperAdmin,
   canManageMembers = false,
   canManageRegionClubs = false,
@@ -1852,7 +1853,7 @@ export default function ActionModal({
                     required
                   >
                     <option value="" disabled>
-                      {regionOptions.length ? 'Select region' : 'No regions available'}
+                      {regionOptions.length ? 'Select region' : regionCatalogLoading ? 'Loading regions...' : 'No regions available'}
                     </option>
                     {regionOptions.map((region) => (
                       <option key={region} value={region}>
