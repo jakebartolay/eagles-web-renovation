@@ -4198,17 +4198,20 @@ function App() {
               }
 
               return (
-                <button
+                <a
                   key={section.page}
                   className={`nav-link ${activePage === section.page ? 'active' : ''}`}
-                  type="button"
-                  onClick={() => handlePageChange(section.page)}
+                  href={pageHash(section.page)}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    handlePageChange(section.page)
+                  }}
                   aria-label={section.label}
                   title={sidebarCollapsed ? section.label : undefined}
                 >
                   <i className={`fas ${section.icon}`}></i>
                   <span className="nav-link-label">{section.label}</span>
-                </button>
+                </a>
               )
             }
 
@@ -4238,16 +4241,19 @@ function App() {
                 </button>
                 <div className="sidebar-subnav">
                   {visiblePages.map((page) => (
-                    <button
+                    <a
                       key={page.page}
                       className={`nav-link sub-link ${activePage === page.page ? 'active' : ''}`}
-                      type="button"
-                      onClick={() => handlePageChange(page.page)}
+                      href={pageHash(page.page)}
+                      onClick={(event) => {
+                        event.preventDefault()
+                        handlePageChange(page.page)
+                      }}
                       aria-label={page.label}
                     >
                       <i className={`fas ${page.icon}`}></i>
                       <span className="nav-link-label">{page.label}</span>
-                    </button>
+                    </a>
                   ))}
                 </div>
               </div>
