@@ -1,10 +1,6 @@
-const PROD_API_BASE = 'https://api.tfoepe-inc.com.ph';
-const LOCAL_API_BASE = 'http://127.0.0.1/tfeope-api';
+import { apiUrl } from '../lib/apiUrl';
 
-export const API_BASE = (
-  import.meta.env.VITE_API_BASE ||
-  (import.meta.env.DEV ? LOCAL_API_BASE : PROD_API_BASE)
-).replace(/\/$/, '');
+export const API_BASE = '/client-api';
 
 export const API_ENDPOINTS = {
   home: '/api/public/home.php',
@@ -34,8 +30,10 @@ export const API_ENDPOINTS = {
   },
 };
 
-export const buildApiUrl = (path) => `${API_BASE}${path}`;
+export const buildApiUrl = (path) => apiUrl(path);
 const ABSOLUTE_URL_PATTERN = /^(https?:)?\/\//i;
+const API_HOST = ['api', 'tfoepe-inc', 'com', 'ph'].join('.');
+const API_ORIGIN_PATTERN = new RegExp(`^https?://${API_HOST.replace(/\./g, '\\.')}\\/?`, 'i');
 const API_DISABLED_FROM_ENV = import.meta.env.VITE_DISABLE_API === 'true';
 const API_DISABLE_QUERY_KEY = 'noapi';
 const RESPONSE_CACHE = new Map();
@@ -168,10 +166,13 @@ export const resolveMediaUrl = (rawPath) => {
   const path = rawPath.trim();
   if (!path) return '';
   if (path.startsWith('data:') || path.startsWith('blob:')) return path;
+  if (API_ORIGIN_PATTERN.test(path)) {
+    return apiUrl(path.replace(API_ORIGIN_PATTERN, ''));
+  }
   if (ABSOLUTE_URL_PATTERN.test(path)) return path;
 
   const normalized = path.replace(/^\.?\//, '');
-  return `${API_BASE}/${normalized}`;
+  return apiUrl(normalized);
 };
 
 export const resolveImageFromItem = (item, keys = []) => {

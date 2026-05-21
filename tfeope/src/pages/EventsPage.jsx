@@ -3,9 +3,9 @@ import { useEffect, useState } from 'react';
 import Skeleton from '@mui/material/Skeleton';
 import Reveal from '../components/Reveal';
 import { API_ENDPOINTS, extractList, fetchJson, resolveImageFromItem } from '../config/api';
+import { apiUrl } from '../lib/apiUrl';
 
 const DEFAULT_EVENT_IMAGE_PATTERN = /default_event\.png/i;
-const REMOTE_EVENT_MEDIA_BASE = 'https://api.tfoepe-inc.com.ph/media.php?group=event_media&file=';
 const EVENT_SKELETON_ITEMS = Array.from({ length: 5 }, (_, idx) => idx);
 
 const getEventDateParts = (event) => {
@@ -42,7 +42,7 @@ const resolveEventImage = (event) => {
 
   // API often returns default_event.png in mediaUrl even when mediaFilename has the real file.
   if ((!direct || DEFAULT_EVENT_IMAGE_PATTERN.test(direct)) && hasRealFilename) {
-    return `${REMOTE_EVENT_MEDIA_BASE}${encodeURIComponent(filename)}`;
+    return apiUrl(`media.php?group=event_media&file=${encodeURIComponent(filename)}`);
   }
 
   return direct;

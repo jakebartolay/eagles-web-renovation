@@ -1,37 +1,5 @@
 import adminBackgroundUrl from './assets/admin-bg.png'
-
-const PROD_API_ORIGIN = 'https://api.tfoepe-inc.com.ph'
-
-function normalizeOrigin(origin) {
-  const trimmed = String(origin || '').trim().replace(/\/$/, '')
-  if (!trimmed) {
-    return trimmed
-  }
-
-  // Force HTTPS for non-local environments.
-  if (!import.meta.env.DEV && /^http:\/\//i.test(trimmed)) {
-    const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(trimmed)
-    if (!isLocalhost) {
-      return trimmed.replace(/^http:\/\//i, 'https://')
-    }
-  }
-
-  return trimmed
-}
-
-const defaultOrigin = import.meta.env.VITE_API_ORIGIN
-  || (import.meta.env.DEV
-    ? 'http://localhost'
-    : PROD_API_ORIGIN)
-
-const API_ORIGIN = normalizeOrigin(defaultOrigin)
-const defaultBasePath = import.meta.env.DEV ? '/tfeope-api' : ''
-const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH ?? defaultBasePath).replace(/\/$/, '')
-
-function apiUrl(pathname) {
-  const normalizedPath = pathname.startsWith('/') ? pathname : `/${pathname}`
-  return `${API_ORIGIN}${API_BASE_PATH}${normalizedPath}`
-}
+import { apiUrl } from './lib/apiUrl'
 
 export const ADMIN_BRANDING = {
   logoUrl: '/logo.png',
@@ -39,7 +7,7 @@ export const ADMIN_BRANDING = {
   title: 'TFEOPE Admin',
 }
 
-export const ADMIN_API_BASE_URL = `${API_ORIGIN}${API_BASE_PATH}`
+export const ADMIN_API_BASE_URL = '/client-api'
 
 export const ADMIN_SESSION_ENDPOINT = apiUrl('/api/admin/session.php')
 export const ADMIN_LOGIN_ENDPOINT = apiUrl('/api/admin/login.php')

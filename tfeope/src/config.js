@@ -1,34 +1,6 @@
-const PROD_API_ORIGIN = 'https://api.tfoepe-inc.com.ph'
+import { apiUrl } from './lib/apiUrl'
 
-function normalizeOrigin(origin) {
-  const trimmed = String(origin || '').trim().replace(/\/$/, '')
-  if (!trimmed) {
-    return trimmed
-  }
-
-  // Force HTTPS outside local development.
-  if (!import.meta.env.DEV && /^http:\/\//i.test(trimmed)) {
-    const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(trimmed)
-    if (!isLocalhost) {
-      return trimmed.replace(/^http:\/\//i, 'https://')
-    }
-  }
-
-  return trimmed
-}
-
-const defaultOrigin = import.meta.env.VITE_API_ORIGIN
-  || (import.meta.env.DEV ? 'http://localhost' : PROD_API_ORIGIN)
-const API_ORIGIN = normalizeOrigin(defaultOrigin)
-const defaultBasePath = import.meta.env.DEV ? '/tfeope-api' : ''
-const API_BASE_PATH = (import.meta.env.VITE_API_BASE_PATH ?? defaultBasePath).replace(/\/$/, '')
-
-function apiUrl(path) {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  return `${API_ORIGIN}${API_BASE_PATH}${normalizedPath}`
-}
-
-export const PUBLIC_API_BASE_URL = `${API_ORIGIN}${API_BASE_PATH}`
+export const PUBLIC_API_BASE_URL = '/client-api'
 
 export const PUBLIC_HOME_ENDPOINT = apiUrl('/api/public/home.php')
 export const PUBLIC_NEWS_ENDPOINT = apiUrl('/v1/client/news/get_all.php')

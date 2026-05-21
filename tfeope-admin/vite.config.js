@@ -5,4 +5,17 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   base: './',
+  server: {
+    proxy: {
+      '/client-api': {
+        target: 'http://localhost/tfeope-api',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/client-api/, ''),
+        cookiePathRewrite: {
+          '*': '/',
+        },
+      },
+    },
+  },
 })
