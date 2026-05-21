@@ -7,7 +7,16 @@ $db = api_db();
 api_require_admin($db);
 
 $members = api_fetch_all($db, "
-    SELECT *
+    SELECT
+        eagles_id,
+        eagles_status,
+        eagles_firstName,
+        eagles_lastName,
+        eagles_position,
+        eagles_club,
+        eagles_region,
+        eagles_pic,
+        eagles_dateAdded
     FROM user_info
     ORDER BY eagles_dateAdded DESC
 ");

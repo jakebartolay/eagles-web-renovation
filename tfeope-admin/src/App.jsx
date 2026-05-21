@@ -107,6 +107,11 @@ const collectionLoaders = [
   { key: 'magnaCarta', label: 'Magna Carta', endpoint: ADMIN_MAGNA_CARTA_ENDPOINT },
 ]
 
+const collectionLoaderByKey = collectionLoaders.reduce((lookup, loader) => {
+  lookup[loader.key] = loader
+  return lookup
+}, {})
+
 const INACTIVITY_WARNING_MS = 20 * 60 * 1000
 const INACTIVITY_EVENTS = ['pointerdown', 'keydown', 'mousemove', 'scroll', 'touchstart']
 
@@ -912,6 +917,8 @@ function App() {
   const [dashboard, setDashboard] = useState(emptyDashboard)
   const [collections, setCollections] = useState(emptyCollections)
   const [moduleErrors, setModuleErrors] = useState({})
+  const [loadedCollections, setLoadedCollections] = useState({})
+  const [loadingCollections, setLoadingCollections] = useState({})
   const [form, setForm] = useState({ username: '', password: '' })
   const [busy, setBusy] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -1319,10 +1326,13 @@ function App() {
     return `Welcome, ${roleLabel} ${displayName}.`
   }
 
-  async function loadCollections(currentUser = null) {
+  async function loadCollections(currentUser = null, collectionKeys = null) {
     const canAccessSuperAdminSections = Number(currentUser?.roleId || 0) === 1
+    const requestedKeys = Array.isArray(collectionKeys) ? new Set(collectionKeys.filter(Boolean)) : null
     const activeLoaders = collectionLoaders.filter(
       (loader) => !loader.superAdminOnly || canAccessSuperAdminSections,
+    ).filter(
+      (loader) => !requestedKeys || requestedKeys.has(loader.key),
     )
 
     const results = await Promise.allSettled(activeLoaders.map(async (loader) => {
@@ -1349,6 +1359,10 @@ function App() {
     let unauthorizedError = null
 
     collectionLoaders.forEach((loader) => {
+      if (requestedKeys && !requestedKeys.has(loader.key)) {
+        return
+      }
+
       if (loader.superAdminOnly && !canAccessSuperAdminSections) {
         nextCollections[loader.key] = []
       }
@@ -1378,7 +1392,7 @@ function App() {
     return { nextCollections, nextErrors, failures }
   }
 
-  async function runAdminRefresh({ silent = false } = {}) {
+  async function runAdminRefresh({ silent = false, collectionKeys = null } = {}) {
     try {
       if (!silent) {
         setRefreshing(true)
@@ -1389,7 +1403,14 @@ function App() {
         credentials: 'include',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
       })
-      const collectionPayload = await loadCollections(dashboardPayload.user || null)
+      const activeCollectionKey = pageToCollectionKey[activePage]
+      const refreshKeys = Array.isArray(collectionKeys)
+        ? collectionKeys
+        : activeCollectionKey
+          ? [activeCollectionKey]
+          : []
+      const collectionPayload = await loadCollections(dashboardPayload.user || null, refreshKeys)
+      const refreshedKeys = Object.keys(collectionPayload.nextCollections)
 
       startTransition(() => {
         setUser(dashboardPayload.user || null)
@@ -1398,7 +1419,19 @@ function App() {
           ...current,
           ...collectionPayload.nextCollections,
         }))
-        setModuleErrors(collectionPayload.nextErrors)
+        setModuleErrors((current) => ({
+          ...current,
+          ...collectionPayload.nextErrors,
+        }))
+        if (refreshedKeys.length > 0) {
+          setLoadedCollections((current) => {
+            const next = { ...current }
+            refreshedKeys.forEach((key) => {
+              next[key] = true
+            })
+            return next
+          })
+        }
       })
 
       if (!silent) {
@@ -1414,9 +1447,11 @@ function App() {
         startTransition(() => {
           setUser(null)
           setDashboard(emptyDashboard)
-        setCollections(emptyCollections)
-        setModuleErrors({})
-      })
+          setCollections(emptyCollections)
+          setModuleErrors({})
+          setLoadedCollections({})
+          setLoadingCollections({})
+        })
       setActionModal(null)
       setSidebarOpen(false)
       setNotice('Your admin session ended. Please sign in again.')
@@ -1434,6 +1469,50 @@ function App() {
 
   const refreshAdminEvent = useEffectEvent(async (options = {}) => {
     await runAdminRefresh(options)
+  })
+
+  const loadActiveCollectionEvent = useEffectEvent(async (collectionKey) => {
+    const loader = collectionLoaderByKey[collectionKey]
+    if (!loader || !user) {
+      return
+    }
+
+    try {
+      setLoadingCollections((current) => ({ ...current, [collectionKey]: true }))
+      setModuleErrors((current) => {
+        const next = { ...current }
+        delete next[collectionKey]
+        return next
+      })
+
+      const collectionPayload = await loadCollections(user, [collectionKey])
+      setCollections((current) => ({
+        ...current,
+        ...collectionPayload.nextCollections,
+      }))
+      setModuleErrors((current) => ({
+        ...current,
+        ...collectionPayload.nextErrors,
+      }))
+      setLoadedCollections((current) => ({ ...current, [collectionKey]: true }))
+
+      if (collectionPayload.failures.length > 0) {
+        setNotice(`${loader.label} could not refresh.`)
+      }
+    } catch (loadError) {
+      if (loadError.status === 401) {
+        await handleLogout()
+        return
+      }
+
+      setModuleErrors((current) => ({
+        ...current,
+        [collectionKey]: loadError.message || `${loader.label} could not sync.`,
+      }))
+      setLoadedCollections((current) => ({ ...current, [collectionKey]: true }))
+    } finally {
+      setLoadingCollections((current) => ({ ...current, [collectionKey]: false }))
+    }
   })
 
   useEffect(() => {
@@ -1459,6 +1538,8 @@ function App() {
             setDashboard(emptyDashboard)
             setCollections(emptyCollections)
             setModuleErrors({})
+            setLoadedCollections({})
+            setLoadingCollections({})
           })
           setCollectionsResolved(false)
           return
@@ -1468,7 +1549,7 @@ function App() {
           setUser(payload.user || null)
         })
 
-        await refreshAdminEvent({ silent: true })
+        await refreshAdminEvent({ silent: true, collectionKeys: [] })
       } catch (sessionError) {
         if (active) {
           setError(sessionError.message || 'Unable to restore the admin session.')
@@ -1515,7 +1596,7 @@ function App() {
     }
 
     const intervalId = window.setInterval(() => {
-      refreshAdminEvent({ silent: true })
+      refreshAdminEvent({ silent: true, collectionKeys: [] })
     }, 60000)
 
     return () => window.clearInterval(intervalId)
@@ -1526,6 +1607,19 @@ function App() {
       setIdlePromptOpen(false)
     }
   }, [user])
+
+  useEffect(() => {
+    if (!user || !collectionsResolved) {
+      return
+    }
+
+    const collectionKey = pageToCollectionKey[activePage]
+    if (!collectionKey || loadedCollections[collectionKey] || loadingCollections[collectionKey]) {
+      return
+    }
+
+    loadActiveCollectionEvent(collectionKey)
+  }, [activePage, collectionsResolved, loadedCollections, loadingCollections, user])
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1715,7 +1809,7 @@ function App() {
 
       setUser(payload.user || null)
 
-      await runAdminRefresh({ silent: true })
+      await runAdminRefresh({ silent: true, collectionKeys: [] })
       setForm({ username: '', password: '' })
       setNotice(formatWelcomeNotice(payload.user || null))
     } catch (loginError) {
@@ -1742,6 +1836,8 @@ function App() {
         setDashboard(emptyDashboard)
         setCollections(emptyCollections)
         setModuleErrors({})
+        setLoadedCollections({})
+        setLoadingCollections({})
       })
       setCollectionsResolved(false)
       setSidebarOpen(false)
@@ -3636,7 +3732,11 @@ function App() {
       ? 'Welcome back'
       : 'Admin update'
   const bannerIcon = error ? 'fa-circle-exclamation' : 'fa-circle-check'
-  const pageLoading = !collectionsResolved || refreshing
+  const activeCollectionKey = pageToCollectionKey[activePage]
+  const pageLoading = !collectionsResolved
+    || refreshing
+    || Boolean(activeCollectionKey && !loadedCollections[activeCollectionKey])
+    || Boolean(activeCollectionKey && loadingCollections[activeCollectionKey])
 
   function renderFloatingBanner() {
     if (!bannerMessage) {

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 const UPSTREAM_API_ORIGIN = 'https://api.tfoepe-inc.com.ph';
 
-$path = trim((string) ($_GET['path'] ?? ''), '/');
-unset($_GET['path']);
+$path = trim((string) ($_GET['__proxy_path'] ?? ''), '/');
+unset($_GET['__proxy_path']);
 
 if ($path === '' || str_contains($path, '..')) {
     http_response_code(400);
