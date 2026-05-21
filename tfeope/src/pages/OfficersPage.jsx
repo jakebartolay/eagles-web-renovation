@@ -7,7 +7,7 @@ import { API_ENDPOINTS, extractList, fetchJson, resolveImageFromItem } from '../
 const OFFICER_GROUPS = {
   national: {
     label: 'National Officers',
-    endpoint: API_ENDPOINTS.officers,
+    endpoint: `${API_ENDPOINTS.officers}?category=national_officers`,
   },
   governors: {
     label: 'Governors',

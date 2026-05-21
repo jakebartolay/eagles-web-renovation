@@ -138,7 +138,11 @@ export const fetchJson = async (endpoint) => {
   incrementInFlightRequestCount();
 
   const requestPromise = fetch(buildApiUrl(endpoint), {
-    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+      'Cache-Control': 'no-cache',
+    },
   });
 
   const parsedPromise = requestPromise
