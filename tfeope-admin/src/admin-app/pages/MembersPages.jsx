@@ -453,7 +453,7 @@ export function MembersPage({
                 <th>Club</th>
                 <th>Region</th>
                 <th>Status</th>
-                {isSuperAdmin ? <th>Actions</th> : null}
+                {canManageMembers ? <th>Actions</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -482,7 +482,7 @@ export function MembersPage({
                     <td data-label="Status">
                       <span className={`member-status-badge ${memberStatusTone(status)}`}>{status}</span>
                     </td>
-                    {isSuperAdmin ? (
+                    {canManageMembers ? (
                       <td data-label="Actions">
                         <div className="members-table__actions">
                           <button
@@ -493,14 +493,16 @@ export function MembersPage({
                             <i className="fas fa-pen-to-square" aria-hidden="true"></i>
                             Edit
                           </button>
-                          <button
-                            type="button"
-                            className="admin-danger-button members-table__button"
-                            onClick={() => onDeleteMember?.(item)}
-                          >
-                            <i className="fas fa-trash-can" aria-hidden="true"></i>
-                            Delete
-                          </button>
+                          {isSuperAdmin ? (
+                            <button
+                              type="button"
+                              className="admin-danger-button members-table__button"
+                              onClick={() => onDeleteMember?.(item)}
+                            >
+                              <i className="fas fa-trash-can" aria-hidden="true"></i>
+                              Delete
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     ) : null}

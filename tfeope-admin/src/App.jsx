@@ -1899,8 +1899,8 @@ function App() {
       return
     }
 
-    if (mode === 'editMember' && !isSuperAdmin) {
-      setError('Only super admins can edit members.')
+    if (mode === 'editMember' && !canManageMembers) {
+      setError('Only admins can edit members.')
       return
     }
 
@@ -2127,6 +2127,10 @@ function App() {
   }
 
   function openMemberEditor(item) {
+    if (!loadedCollections.governors && !loadingCollections.governors) {
+      loadActiveCollectionEvent('governors')
+    }
+
     const incomingRegion = String(item?.region || item?.eagles_region || '').trim()
     const normalizedRegion = resolveRegionName(incomingRegion)
     const incomingClub = String(item?.club || item?.eagles_club || '').trim()
@@ -2430,8 +2434,8 @@ function App() {
   async function handleSaveMember(event) {
     event.preventDefault()
 
-    if (actionModal === 'editMember' && !isSuperAdmin) {
-      setError('Only super admins can edit members.')
+    if (actionModal === 'editMember' && !canManageMembers) {
+      setError('Only admins can edit members.')
       return
     }
 

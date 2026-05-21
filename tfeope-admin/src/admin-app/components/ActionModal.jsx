@@ -1739,7 +1739,7 @@ export default function ActionModal({
           </form>
         )}
 
-        {(mode === 'member' || mode === 'editMember') && (isEditingMember ? isSuperAdmin : canManageMembers) && (
+        {(mode === 'member' || mode === 'editMember') && canManageMembers && (
           <form onSubmit={onMemberSubmit} className="admin-modal-form">
             <div className="member-editor-layout">
               <MemberPreview memberForm={memberForm} isEditingMember={isEditingMember} />
