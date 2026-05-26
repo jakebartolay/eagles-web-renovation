@@ -22,6 +22,8 @@ import {
   ADMIN_EVENTS_DELETE_ENDPOINT,
   ADMIN_FILE_MANAGER_ENDPOINT,
   ADMIN_CLUBS_CREATE_ENDPOINT,
+  ADMIN_CLUBS_DELETE_ENDPOINT,
+  ADMIN_CLUBS_UPDATE_ENDPOINT,
   ADMIN_GOVERNORS_CREATE_ENDPOINT,
   ADMIN_GOVERNORS_DELETE_ENDPOINT,
   ADMIN_GOVERNORS_ENDPOINT,
@@ -1046,6 +1048,7 @@ function App() {
     governor_name: '',
     region_id: '',
     region_name: '',
+    club_id: '',
     club_name: '',
   })
   const [memorandumComposer, setMemorandumComposer] = useState({
@@ -1269,6 +1272,7 @@ function App() {
       governor_name: '',
       region_id: '',
       region_name: '',
+      club_id: '',
       club_name: '',
     })
   }
@@ -2336,6 +2340,7 @@ function App() {
             governor_name: '',
             region_id: '',
             region_name: '',
+            club_id: '',
             club_name: '',
           }
         }
@@ -2349,6 +2354,7 @@ function App() {
             governor_name: '',
             region_id: '',
             region_name: '',
+            club_id: '',
             club_name: '',
           }
         }
@@ -2367,6 +2373,7 @@ function App() {
           governor_name: parsedGovernorName,
           region_id: parsedRegionId > 0 ? String(parsedRegionId) : '',
           region_name: parsedRegionName,
+          club_id: '',
           club_name: '',
         }
       }
@@ -2374,10 +2381,39 @@ function App() {
       if (field === 'setup_action') {
         const nextAction = String(value || '').trim()
         if (nextAction === 'rename_region') {
-          return { ...current, setup_action: 'rename_region', club_name: '' }
+          return { ...current, setup_action: 'rename_region', club_id: '', club_name: '' }
         }
 
-        return { ...current, setup_action: 'add_club' }
+        if (nextAction === 'rename_club') {
+          return { ...current, setup_action: 'rename_club', club_id: '', club_name: '' }
+        }
+
+        if (nextAction === 'delete_club') {
+          return { ...current, setup_action: 'delete_club', club_id: '', club_name: '' }
+        }
+
+        return { ...current, setup_action: 'add_club', club_id: '', club_name: '' }
+      }
+
+      if (field === 'club_id') {
+        const nextClubId = String(value || '').trim()
+        const selectedGovernorId = Number(current.governor_id || 0) || 0
+        const selectedRegionId = Number(current.region_id || 0) || 0
+        const selectedGovernor = collections.governors.find((governor) => (
+          (Number(governor?.id ?? governor?.governor_id ?? 0) || 0) === selectedGovernorId
+        ))
+        const selectedRegion = (Array.isArray(selectedGovernor?.regions) ? selectedGovernor.regions : []).find((region) => (
+          (Number(region?.id ?? region?.region_id ?? 0) || 0) === selectedRegionId
+        ))
+        const selectedClub = (Array.isArray(selectedRegion?.clubs) ? selectedRegion.clubs : []).find((club) => (
+          String(club?.id ?? club?.club_id ?? '').trim() === nextClubId
+        ))
+
+        return {
+          ...current,
+          club_id: nextClubId,
+          club_name: String(selectedClub?.name || selectedClub?.club_name || '').trim(),
+        }
       }
 
       return { ...current, [field]: value }
@@ -2557,6 +2593,9 @@ function App() {
       const regionName = String(regionClubComposer.region_name || '').trim()
       const clubName = String(regionClubComposer.club_name || '').trim()
       const renameExistingRegion = setupAction === 'rename_region' && selectedRegionId > 0
+      const renameExistingClub = setupAction === 'rename_club' && selectedRegionId > 0
+      const deleteExistingClub = setupAction === 'delete_club' && selectedRegionId > 0
+      const selectedClubId = Number(regionClubComposer.club_id || 0) || 0
       let governorId = Number(selectedGovernor || 0) || 0
       let normalizedGovernorName = String(regionClubComposer.governor_name || '').trim()
       let createdGovernor = false
@@ -2570,6 +2609,16 @@ function App() {
 
       if (!isSuperAdmin && renameExistingRegion) {
         setError('Only super admins can rename regions.')
+        return
+      }
+
+      if (!isSuperAdmin && renameExistingClub) {
+        setError('Only super admins can rename clubs.')
+        return
+      }
+
+      if (!isSuperAdmin && deleteExistingClub) {
+        setError('Only super admins can delete clubs.')
         return
       }
 
@@ -2606,7 +2655,7 @@ function App() {
         return
       }
 
-      if (selectedGovernorSelection !== '__NEW__' && regionId > 0 && clubName === '' && !renameExistingRegion) {
+      if (selectedGovernorSelection !== '__NEW__' && regionId > 0 && clubName === '' && !renameExistingRegion && !renameExistingClub && !deleteExistingClub) {
         setError('Please enter a club name under the selected governor and region.')
         return
       }
@@ -2656,6 +2705,88 @@ function App() {
         } else {
           setNotice(`Updated region ${normalizedRegionName} successfully.`)
         }
+        closeActionModal(true)
+        resetRegionClubComposer()
+        return
+      }
+
+      if (deleteExistingClub) {
+        if (selectedClubId <= 0) {
+          setError('Please choose the club you want to delete.')
+          return
+        }
+
+        const clubLabel = String(regionClubComposer.club_name || 'this club').trim() || 'this club'
+        openDeleteConfirm({
+          title: 'Delete Club?',
+          message: `Delete "${clubLabel}" permanently? This action cannot be undone.`,
+          confirmLabel: 'Delete Club',
+          onConfirm: async () => {
+            try {
+              setActionBusy(true)
+              setError('')
+              setNotice('')
+
+              await requestJson(ADMIN_CLUBS_DELETE_ENDPOINT, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-Requested-With': 'XMLHttpRequest',
+                },
+                body: JSON.stringify({
+                  id: selectedClubId,
+                }),
+              })
+
+              await runAdminRefresh({ silent: true })
+              setActivePage('governors')
+              setOpenGroups((current) => ({ ...current, leadership: true }))
+              setNotice(`Deleted club ${clubLabel} successfully.`)
+              closeActionModal(true)
+              resetRegionClubComposer()
+            } catch (deleteError) {
+              setError(deleteError.message || 'Unable to delete the club.')
+            } finally {
+              setActionBusy(false)
+            }
+          },
+        })
+        return
+      }
+
+      if (renameExistingClub) {
+        if (selectedClubId <= 0) {
+          setError('Please choose the club you want to update.')
+          return
+        }
+
+        if (clubName === '') {
+          setError('Updated club name is required.')
+          return
+        }
+
+        const clubPayload = await requestJson(ADMIN_CLUBS_UPDATE_ENDPOINT, {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: JSON.stringify({
+            id: selectedClubId,
+            name: clubName,
+            region_id: regionId,
+            governor_id: governorId,
+          }),
+        })
+
+        const normalizedClubName = String(clubPayload?.data?.name || clubName).trim() || clubName
+
+        await runAdminRefresh({ silent: true })
+        setActivePage('governors')
+        setOpenGroups((current) => ({ ...current, leadership: true }))
+        setNotice(`Updated club ${normalizedClubName} successfully.`)
         closeActionModal(true)
         resetRegionClubComposer()
         return

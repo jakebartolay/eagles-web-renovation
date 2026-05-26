@@ -59,5 +59,7 @@ export const ADMIN_APPOINTED_DELETE_ENDPOINT = apiUrl('/v1/admin/appointed/delet
 export const ADMIN_REGIONS_CREATE_ENDPOINT = apiUrl('/v1/admin/regions/create.php')
 export const ADMIN_REGIONS_UPDATE_ENDPOINT = apiUrl('/v1/admin/regions/update.php')
 export const ADMIN_CLUBS_CREATE_ENDPOINT = apiUrl('/v1/admin/clubs/create.php')
+export const ADMIN_CLUBS_UPDATE_ENDPOINT = apiUrl('/v1/admin/clubs/update.php')
+export const ADMIN_CLUBS_DELETE_ENDPOINT = apiUrl('/v1/admin/clubs/delete.php')
 export const APPOINTED_ENDPOINT = apiUrl('/v1/client/appointed/get_all.php')
 export const MAGNA_CARTA_ENDPOINT = apiUrl('/v1/client/magna_carta/get_all.php')

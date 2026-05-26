@@ -94,7 +94,7 @@ const modalCopy = {
   regionClub: {
     eyebrow: 'Member Directory',
     title: 'Setup Region + Club',
-    subtitle: 'Encode governor, region, and club first so Add Member stays clean and dropdown-only. You can also rename an existing region here.',
+    subtitle: 'Encode governor, region, and club first so Add Member stays clean and dropdown-only. You can also rename or delete existing clubs here.',
     submitLabel: 'Save Setup',
   },
   user: {
@@ -1052,8 +1052,36 @@ export default function ActionModal({
   )
   const selectedSetupAction = String(regionClubForm?.setup_action || 'add_club').trim()
   const selectedRenameAction = hasSelectedExistingRegion && selectedSetupAction === 'rename_region'
+  const selectedClubRenameAction = hasSelectedExistingRegion && selectedSetupAction === 'rename_club'
+  const selectedClubDeleteAction = hasSelectedExistingRegion && selectedSetupAction === 'delete_club'
   const selectedRegionLocked = hasSelectedExistingRegion && !selectedRenameAction
-  const regionClubSubmitLabel = selectedRenameAction ? 'Update Region Name' : copy.submitLabel
+  const selectedRegionClubs = []
+  if (hasSelectedExistingRegion) {
+    const selectedGovernorId = Number(regionClubForm?.governor_id || 0) || 0
+    const selectedRegionId = Number(regionClubForm?.region_id || 0) || 0
+    const selectedGovernor = (Array.isArray(governors) ? governors : []).find((governor) => (
+      (Number(governor?.id ?? governor?.governor_id ?? 0) || 0) === selectedGovernorId
+    ))
+    const selectedRegion = (Array.isArray(selectedGovernor?.regions) ? selectedGovernor.regions : []).find((region) => (
+      (Number(region?.id ?? region?.region_id ?? 0) || 0) === selectedRegionId
+    ))
+
+    ;(Array.isArray(selectedRegion?.clubs) ? selectedRegion.clubs : []).forEach((club) => {
+      const clubId = Number(club?.id ?? club?.club_id ?? 0) || 0
+      const clubName = String(club?.name || club?.club_name || '').trim()
+      if (clubId > 0 && clubName !== '') {
+        selectedRegionClubs.push({ id: clubId, name: clubName })
+      }
+    })
+  }
+  selectedRegionClubs.sort((first, second) => first.name.localeCompare(second.name))
+  const regionClubSubmitLabel = selectedRenameAction
+    ? 'Update Region Name'
+    : selectedClubRenameAction
+      ? 'Update Club Name'
+      : selectedClubDeleteAction
+        ? 'Delete Club'
+        : copy.submitLabel
   const now = new Date()
   const localToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   const localYesterday = new Date(localToday)
@@ -1663,13 +1691,15 @@ export default function ActionModal({
               {hasSelectedExistingRegion && isSuperAdmin ? (
                 <Field
                   label="Setup action"
-                  helper="Pick whether you want to add a club or rename the selected region."
+                  helper="Pick whether you want to add, rename, or delete a club."
                 >
                   <select
-                    value={selectedRenameAction ? 'rename_region' : 'add_club'}
+                    value={selectedClubDeleteAction ? 'delete_club' : selectedClubRenameAction ? 'rename_club' : selectedRenameAction ? 'rename_region' : 'add_club'}
                     onChange={(event) => onRegionClubFieldChange('setup_action', event.target.value)}
                   >
                     <option value="add_club">Add club under selected region</option>
+                    <option value="rename_club">Update selected club name</option>
+                    <option value="delete_club">Delete selected club</option>
                     <option value="rename_region">Update selected region name</option>
                   </select>
                 </Field>
@@ -1705,32 +1735,62 @@ export default function ActionModal({
                 />
               </Field>
 
-              <Field
-                label="Club name"
-                helper={selectedRenameAction
-                  ? 'Disabled while renaming region.'
-                  : selectedRegionLocked
-                    ? 'Add club under the selected governor and region.'
-                    : 'Optional. Leave blank if you only want to create governor/region.'}
-              >
-                <input
-                  type="text"
-                  placeholder="Enter club name"
-                  value={regionClubForm?.club_name || ''}
-                  onChange={(event) => onRegionClubFieldChange('club_name', event.target.value)}
-                  disabled={selectedRenameAction}
-                  required={selectedRegionLocked && !selectedRenameAction}
-                />
-              </Field>
+              {selectedClubRenameAction || selectedClubDeleteAction ? (
+                <Field
+                  label="Existing club"
+                  helper={selectedClubDeleteAction ? 'Choose the club record to delete.' : 'Choose the club record to rename.'}
+                >
+                  <select
+                    value={regionClubForm?.club_id || ''}
+                    onChange={(event) => onRegionClubFieldChange('club_id', event.target.value)}
+                    required
+                  >
+                    <option value="" disabled>
+                      {selectedRegionClubs.length ? 'Select club' : 'No clubs available for this region'}
+                    </option>
+                    {selectedRegionClubs.map((club) => (
+                      <option key={club.id} value={club.id}>
+                        {club.name}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              ) : null}
+
+              {!selectedClubDeleteAction ? (
+                <Field
+                  label={selectedClubRenameAction ? 'Updated club name' : 'Club name'}
+                  helper={selectedRenameAction
+                    ? 'Disabled while renaming region.'
+                    : selectedClubRenameAction
+                      ? 'Edit this to rename the selected club.'
+                    : selectedRegionLocked
+                      ? 'Add club under the selected governor and region.'
+                      : 'Optional. Leave blank if you only want to create governor/region.'}
+                >
+                  <input
+                    type="text"
+                    placeholder={selectedClubRenameAction ? 'Enter updated club name' : 'Enter club name'}
+                    value={regionClubForm?.club_name || ''}
+                    onChange={(event) => onRegionClubFieldChange('club_name', event.target.value)}
+                    disabled={selectedRenameAction}
+                    required={selectedRegionLocked && !selectedRenameAction}
+                  />
+                </Field>
+              ) : null}
             </div>
 
             <div className="admin-modal-actions">
               <button type="button" className="admin-secondary-button" onClick={onClose}>
                 Cancel
               </button>
-              <button type="submit" className="admin-primary-button" disabled={submitting}>
+              <button
+                type="submit"
+                className={selectedClubDeleteAction ? 'admin-danger-button' : 'admin-primary-button'}
+                disabled={submitting}
+              >
                 <i
-                  className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-diagram-project'}`}
+                  className={`fas ${submitting ? 'fa-circle-notch fa-spin' : selectedClubDeleteAction ? 'fa-trash' : 'fa-diagram-project'}`}
                   aria-hidden="true"
                 ></i>
                 {submitting ? 'Saving...' : regionClubSubmitLabel}

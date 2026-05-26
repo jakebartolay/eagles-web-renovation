@@ -2236,6 +2236,8 @@ if (!function_exists('api_governor_list')) {
                     $clubItems[] = [
                         'id' => $clubId,
                         'name' => (string) ($club['club_name'] ?? ''),
+                        'regionId' => (int) ($club['region_id'] ?? 0),
+                        'governorId' => (int) ($club['governor_id'] ?? 0),
                         'presidents' => array_map(
                             static fn (array $president): array => [
                                 'id' => (int) ($president['president_id'] ?? 0),
