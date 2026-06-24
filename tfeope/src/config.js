@@ -11,10 +11,6 @@ export const PUBLIC_GOVERNORS_ENDPOINT = apiUrl('/v1/client/governors/get_all.ph
 export const PUBLIC_OFFICERS_ENDPOINT = apiUrl('/v1/client/officers/get_all.php')
 export const PUBLIC_MAGNA_CARTA_ENDPOINT = apiUrl('/v1/client/magna_carta/get_all.php')
 export const PUBLIC_APPOINTED_ENDPOINT = apiUrl('/v1/client/appointed/get_all.php')
-export const PUBLIC_AUTH_SESSION_ENDPOINT = apiUrl('/v1/client/auth/session.php')
-export const PUBLIC_AUTH_LOGIN_ENDPOINT = apiUrl('/v1/client/auth/login.php')
-export const PUBLIC_AUTH_SIGNUP_ENDPOINT = apiUrl('/v1/client/auth/signup.php')
-export const PUBLIC_MEMBER_VERIFY_ENDPOINT = apiUrl('/v1/client/members/verify.php')
 
 export const PUBLIC_BRANDING = {
   logoUrl: new URL('./static/logo.png', import.meta.url).href,

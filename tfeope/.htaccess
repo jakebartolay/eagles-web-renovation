@@ -1,4 +1,4 @@
-DirectoryIndex index.php index.html
+DirectoryIndex index.html index.php
 ErrorDocument 403 errors/403.html
 ErrorDocument 404 errors/404.html
 ErrorDocument 500 errors/500.html
@@ -8,10 +8,18 @@ RewriteEngine On
 # Reverse proxy API calls before the app fallback.
 RewriteRule ^client-api/(.*)$ client-api-proxy.php?__proxy_path=$1 [L,QSA]
 
+# Member access and forum now live in the standalone forum app.
+RewriteRule ^users/?$ /tfeope-forum/login [R=302,L]
+RewriteRule ^users/login/?$ /tfeope-forum/login [R=302,L]
+RewriteRule ^users/signup/?$ /tfeope-forum/signup [R=302,L]
+RewriteRule ^users/(profile|portal)/?$ /tfeope-forum/profile [R=302,L]
+RewriteRule ^member/login/?$ /tfeope-forum/login [R=302,L]
+RewriteRule ^forum/?$ /tfeope-forum/forum [R=302,L]
+
 # Serve existing files/directories directly, including dist assets.
 RewriteCond %{REQUEST_FILENAME} -f [OR]
 RewriteCond %{REQUEST_FILENAME} -d
 RewriteRule ^ - [L]
 
-# Fallback all public routes to the React/PHP entry.
-RewriteRule ^ index.php [L]
+# Fallback all public routes to the Vite app entry.
+RewriteRule ^ index.html [L]

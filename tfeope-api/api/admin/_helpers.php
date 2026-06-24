@@ -85,6 +85,7 @@ if (!function_exists('admin_api_recent_members')) {
         if (!api_table_exists($db, 'user_info')) {
             return [];
         }
+        $regionalPositionSelect = api_member_regional_position_select($db);
 
         $limit = max(1, min(24, $limit));
         $rows = api_fetch_all($db, sprintf(
@@ -97,6 +98,7 @@ if (!function_exists('admin_api_recent_members')) {
                     eagles_position,
                     eagles_club,
                     eagles_region,
+                    ' . $regionalPositionSelect . ',
                     eagles_pic,
                     eagles_dateAdded
                 FROM user_info
@@ -123,6 +125,8 @@ if (!function_exists('admin_api_recent_members')) {
                 'lastName' => $lastName,
                 'fullName' => $fullName !== '' ? $fullName : 'Unnamed member',
                 'position' => (string) ($row['eagles_position'] ?? ''),
+                'regionalPosition' => api_member_regional_position_value($row),
+                'regional_position' => api_member_regional_position_value($row),
                 'club' => (string) ($row['eagles_club'] ?? ''),
                 'region' => (string) ($row['eagles_region'] ?? ''),
                 'photoUrl' => $photoAsset['url'] ?? null,

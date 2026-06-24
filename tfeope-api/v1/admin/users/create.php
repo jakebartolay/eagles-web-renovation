@@ -10,6 +10,7 @@ api_require_method('POST');
 function api_admin_role_label(int $roleId): string
 {
     return match ($roleId) {
+        0 => 'Member',
         1 => 'Super Admin',
         2 => 'Admin',
         3 => 'Maintenance',
@@ -49,11 +50,44 @@ try {
         ], 422);
     }
 
-    if ($roleId < 1 || $roleId > 4) {
+    if ($roleId < 0 || $roleId > 4) {
         api_json([
             'ok' => false,
             'message' => 'A valid role is required.',
         ], 422);
+    }
+
+    // Member accounts require a valid Eagles ID linked to user_info
+    if ($roleId === 0) {
+        if ($eaglesId === '') {
+            api_json([
+                'ok' => false,
+                'message' => 'Eagles ID is required for Member accounts.',
+            ], 422);
+        }
+
+        if (api_table_exists($db, 'user_info')) {
+            $memberExists = api_fetch_one($db, '
+                SELECT eagles_id FROM user_info WHERE eagles_id = :id LIMIT 1
+            ', [':id' => $eaglesId]);
+
+            if (!$memberExists) {
+                api_json([
+                    'ok' => false,
+                    'message' => 'Eagles ID not found in member records.',
+                ], 404);
+            }
+        }
+
+        // Auto-fill name from user_info if not provided
+        if ($name === '' && api_table_exists($db, 'user_info')) {
+            $memberRow = api_fetch_one($db, '
+                SELECT eagles_firstName, eagles_lastName FROM user_info WHERE eagles_id = :id LIMIT 1
+            ', [':id' => $eaglesId]);
+            if ($memberRow) {
+                $name = trim(($memberRow['eagles_firstName'] ?? '') . ' ' . ($memberRow['eagles_lastName'] ?? ''));
+            }
+        }
     }
 
     $duplicate = api_fetch_one($db, '

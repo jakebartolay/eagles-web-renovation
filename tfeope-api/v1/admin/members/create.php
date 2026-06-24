@@ -17,10 +17,12 @@ try {
             'message' => 'Members table is not available.',
         ], 500);
     }
+    $regionalPositionColumn = api_member_regional_position_column($db);
+    $regionalPositionSql = api_quote_identifier((string) $regionalPositionColumn);
 
     $payload = api_request_data();
 
-    $memberId = trim((string) ($payload['id'] ?? $payload['eagles_id'] ?? ''));
+    $memberId = trim((string) api_payload_value($payload, ['id', 'ID', 'eagles_id', 'member_id'], ''));
     if ($memberId === '') {
         $memberId = 'EAG_' . strtoupper(substr(str_replace('.', '', uniqid('', true)), -12));
     }
@@ -39,19 +41,28 @@ try {
         ], 409);
     }
 
-    $firstName = strtoupper(trim((string) ($payload['first_name'] ?? $payload['eagles_firstName'] ?? '')));
-    $lastName = strtoupper(trim((string) ($payload['last_name'] ?? $payload['eagles_lastName'] ?? '')));
-    $position = strtoupper(trim((string) ($payload['position'] ?? $payload['eagles_position'] ?? '')));
+    $firstName = strtoupper(trim((string) api_payload_value($payload, ['first_name', 'firstName', 'First Name', 'eagles_firstName'], '')));
+    $lastName = strtoupper(trim((string) api_payload_value($payload, ['last_name', 'lastName', 'Last Name', 'eagles_lastName'], '')));
+    $position = strtoupper(trim((string) api_payload_value($payload, ['position', 'Position', 'eagles_position'], '')));
+    $regionalPosition = strtoupper(trim((string) api_payload_value($payload, [
+        'regional_position',
+        'regionalPosition',
+        'regional position',
+        'REGIONAL POSITION',
+        'regional_postion',
+        'regional postion',
+        'eagles_regional_position',
+    ], '')));
 
-    $clubSelection = trim((string) ($payload['club'] ?? $payload['eagles_club'] ?? ''));
-    $clubNew = strtoupper(trim((string) ($payload['club_new'] ?? '')));
+    $clubSelection = trim((string) api_payload_value($payload, ['club', 'Club', 'club_name', 'eagles_club'], ''));
+    $clubNew = strtoupper(trim((string) api_payload_value($payload, ['club_new', 'clubNew'], '')));
     $club = $clubSelection === '__NEW__' ? $clubNew : strtoupper($clubSelection);
 
-    $regionSelection = trim((string) ($payload['region'] ?? $payload['eagles_region'] ?? ''));
-    $regionNew = strtoupper(trim((string) ($payload['region_new'] ?? '')));
+    $regionSelection = trim((string) api_payload_value($payload, ['region', 'Region', 'region_name', 'eagles_region'], ''));
+    $regionNew = strtoupper(trim((string) api_payload_value($payload, ['region_new', 'regionNew'], '')));
     $region = $regionSelection === '__NEW__' ? $regionNew : strtoupper($regionSelection);
 
-    $status = strtoupper(trim((string) ($payload['status'] ?? $payload['eagles_status'] ?? 'ACTIVE')));
+    $status = strtoupper(trim((string) api_payload_value($payload, ['status', 'Status', 'eagles_status'], 'ACTIVE')));
     if ($status === '') {
         $status = 'ACTIVE';
     }
@@ -63,11 +74,20 @@ try {
         ], 422);
     }
 
-    if ($firstName === '' || $lastName === '' || $position === '' || $club === '' || $region === '') {
+    if ($firstName === '' || $lastName === '' || $position === '' || $club === '' || $region === '' || $regionalPosition === '') {
         api_json([
             'success' => false,
             'message' => 'Please complete all required member fields.',
         ], 422);
+    }
+
+    try {
+        $catalogResult = api_ensure_region_club_catalog($db, $region, $club);
+        if (($catalogResult['ok'] ?? false) !== true && ($catalogResult['reason'] ?? '') !== '') {
+            error_log('Member create catalog notice: ' . $catalogResult['reason'] . ' Region=' . $region . ' Club=' . $club);
+        }
+    } catch (Throwable $catalogError) {
+        error_log('Member create catalog notice: ' . $catalogError->getMessage());
     }
 
     $photoUpload = $_FILES['photo'] ?? $_FILES['eagles_pic'] ?? null;
@@ -86,6 +106,7 @@ try {
                 eagles_firstName,
                 eagles_lastName,
                 eagles_position,
+                ' . $regionalPositionSql . ',
                 eagles_club,
                 eagles_region,
                 eagles_status,
@@ -95,6 +116,7 @@ try {
                 :eagles_firstName,
                 :eagles_lastName,
                 :eagles_position,
+                :regional_position,
                 :eagles_club,
                 :eagles_region,
                 :eagles_status,
@@ -107,9 +129,11 @@ try {
             ':eagles_position' => $position,
             ':eagles_club' => $club,
             ':eagles_region' => $region,
+            ':regional_position' => $regionalPosition,
             ':eagles_status' => $status,
             ':eagles_pic' => $nextPhoto,
         ]);
+        $regionalPositionSave = api_save_member_regional_position($db, $memberId, $regionalPosition);
     } catch (Throwable $error) {
         if ($storedPhoto !== null) {
             api_delete_uploaded_file('members', $storedPhoto['filename'] ?? null);
@@ -144,6 +168,7 @@ try {
             eagles_position,
             eagles_club,
             eagles_region,
+            ' . api_member_regional_position_select($db) . ',
             eagles_pic,
             eagles_dateAdded
         FROM user_info
@@ -166,6 +191,10 @@ try {
             'lastName' => (string) ($row['eagles_lastName'] ?? $lastName),
             'fullName' => trim((string) (($row['eagles_firstName'] ?? $firstName) . ' ' . ($row['eagles_lastName'] ?? $lastName))),
             'position' => (string) ($row['eagles_position'] ?? $position),
+            'regionalPosition' => api_member_regional_position_value($row ?? []) ?: $regionalPosition,
+            'regional_position' => api_member_regional_position_value($row ?? []) ?: $regionalPosition,
+            'regionalPositionColumn' => $regionalPositionSave['column'] ?? $regionalPositionColumn,
+            'regionalPositionSaved' => api_member_regional_position_value($row ?? []),
             'club' => (string) ($row['eagles_club'] ?? $club),
             'region' => (string) ($row['eagles_region'] ?? $region),
             'picUrl' => $photoAsset['url'] ?? null,
@@ -176,8 +205,11 @@ try {
     ], 201);
 } catch (Throwable $error) {
     error_log('Admin member create API error: ' . $error->getMessage());
+    $message = str_contains($error->getMessage(), 'Regional position')
+        ? $error->getMessage()
+        : 'Unable to add member right now.';
     api_json([
         'success' => false,
-        'message' => 'Unable to add member right now.',
+        'message' => $message,
     ], 500);
 }

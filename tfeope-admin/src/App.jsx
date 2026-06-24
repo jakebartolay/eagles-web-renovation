@@ -52,6 +52,8 @@ import {
   ADMIN_USERS_CREATE_ENDPOINT,
   ADMIN_USERS_UPDATE_ENDPOINT,
   ADMIN_USERS_DELETE_ENDPOINT,
+  ADMIN_USERS_CREATE_MEMBER_ACCOUNT_ENDPOINT,
+  ADMIN_MEMBER_LOOKUP_ENDPOINT,
   ADMIN_REGIONS_CREATE_ENDPOINT,
   ADMIN_REGIONS_UPDATE_ENDPOINT,
   ADMIN_PAST_LEADERS_ENDPOINT,
@@ -1034,6 +1036,7 @@ function App() {
     first_name: '',
     last_name: '',
     position: '',
+    regional_position: '',
     club: '',
     region: '',
     status: normalizeMemberStatus('ACTIVE'),
@@ -1076,6 +1079,12 @@ function App() {
     confirmPassword: '',
     roleId: '2',
     eaglesId: '',
+  })
+  const [memberAccountComposer, setMemberAccountComposer] = useState({
+    eaglesId: '',
+    username: '',
+    password: '',
+    passwordConfirm: '',
   })
   const [memberImportForm, setMemberImportForm] = useState({
     file: null,
@@ -1255,6 +1264,7 @@ function App() {
       first_name: '',
       last_name: '',
       position: '',
+      regional_position: '',
       club: '',
       region: '',
       status: normalizeMemberStatus('ACTIVE'),
@@ -1310,6 +1320,60 @@ function App() {
       roleId: '2',
       eaglesId: '',
     })
+  }
+
+  function resetMemberAccountComposer() {
+    setMemberAccountComposer({ eaglesId: '', username: '', password: '', passwordConfirm: '' })
+  }
+
+  function handleMemberAccountFieldChange(field, value) {
+    setMemberAccountComposer((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleCreateMemberAccount(event) {
+    event.preventDefault()
+
+    const eaglesId = String(memberAccountComposer.eaglesId || '').trim().toUpperCase()
+    const username = String(memberAccountComposer.username || '').trim()
+    const password = String(memberAccountComposer.password || '')
+    const passwordConfirm = String(memberAccountComposer.passwordConfirm || '')
+
+    if (!eaglesId || !username || !password) {
+      setError('Eagles ID, username, and password are required.')
+      return
+    }
+    if (password !== passwordConfirm) {
+      setError('Passwords do not match.')
+      return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.')
+      return
+    }
+
+    try {
+      setActionBusy(true)
+      setError('')
+      setNotice('')
+
+      await requestJson(ADMIN_USERS_CREATE_MEMBER_ACCOUNT_ENDPOINT, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ eagles_id: eaglesId, username, password, password_confirm: passwordConfirm }),
+      })
+
+      await runAdminRefresh({ silent: true })
+      setActivePage('users')
+      setOpenGroups((current) => ({ ...current, members: true }))
+      setNotice('Member portal account created successfully.')
+      closeActionModal(true)
+      resetMemberAccountComposer()
+    } catch (err) {
+      setError(err.message || 'Unable to create member account.')
+    } finally {
+      setActionBusy(false)
+    }
   }
 
   function resetMemberImportForm() {
@@ -2145,6 +2209,7 @@ function App() {
       first_name: String(item?.firstName || item?.first_name || '').trim(),
       last_name: String(item?.lastName || item?.last_name || '').trim(),
       position: String(item?.position || item?.eagles_position || '').trim(),
+      regional_position: String(item?.regionalPosition || item?.regional_position || item?.eagles_regional_position || '').trim(),
       club: normalizedClub,
       region: normalizedRegion,
       status: normalizeMemberStatus(item?.status || item?.eagles_status || 'ACTIVE'),
@@ -2489,7 +2554,14 @@ function App() {
 
       const effectiveRegion = resolveRegionName(String(memberComposer.region || '').trim())
       const effectiveClub = resolveClubName(effectiveRegion, String(memberComposer.club || '').trim())
+      const effectiveRegionalPosition = String(memberComposer.regional_position || '').trim()
       const hasStructuredRegions = Object.keys(regionCatalogByKey).length > 0
+
+      if (effectiveRegionalPosition === '') {
+        setError('Please enter a regional position.')
+        clearActionProgress()
+        return
+      }
 
       if (effectiveRegion === '') {
         setError('Please choose a region first.')
@@ -2535,6 +2607,7 @@ function App() {
       formData.append('first_name', memberComposer.first_name)
       formData.append('last_name', memberComposer.last_name)
       formData.append('position', memberComposer.position)
+      formData.append('regional_position', effectiveRegionalPosition)
       formData.append('club', effectiveClub)
       formData.append('region', effectiveRegion)
       formData.append('status', normalizeMemberStatus(memberComposer.status))
@@ -4109,6 +4182,7 @@ function App() {
             loading={pageLoading}
             isSuperAdmin={isSuperAdmin}
             onCreateUser={() => openActionModal('user')}
+            onCreateMemberAccount={() => openActionModal('memberAccount')}
             onEditUser={openUserEditor}
             onDeleteUser={handleDeleteUser}
           />
@@ -4543,6 +4617,7 @@ function App() {
         onUserSubmit={handleCreateUser}
         onMemorandumSubmit={handleSaveMemorandum}
         onMagnaCartaSubmit={handleSaveMagnaCarta}
+        onMemberAccountSubmit={handleCreateMemberAccount}
         newsForm={newsComposer}
         videoForm={videoComposer}
         eventForm={eventComposer}
@@ -4557,6 +4632,7 @@ function App() {
         userForm={userComposer}
         memorandumForm={memorandumComposer}
         magnaCartaForm={magnaCartaComposer}
+        memberAccountForm={memberAccountComposer}
         onNewsFieldChange={updateNewsComposer}
         onVideoFieldChange={updateVideoComposer}
         onEventFieldChange={updateEventComposer}
@@ -4570,6 +4646,8 @@ function App() {
         onUserFieldChange={updateUserComposer}
         onMemorandumFieldChange={updateMemorandumComposer}
         onMagnaCartaFieldChange={updateMagnaCartaComposer}
+        onMemberAccountFieldChange={handleMemberAccountFieldChange}
+        memberAccountLookupEndpoint={ADMIN_MEMBER_LOOKUP_ENDPOINT}
         submitting={actionBusy}
         regions={regions}
         regionClubMap={regionClubMap}

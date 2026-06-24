@@ -259,6 +259,44 @@ if (!function_exists('api_request_data')) {
     }
 }
 
+if (!function_exists('api_normalize_payload_key')) {
+    function api_normalize_payload_key(string $key): string
+    {
+        $normalized = strtolower(trim($key));
+        $normalized = preg_replace('/[^a-z0-9]+/', '_', $normalized);
+
+        return trim((string) $normalized, '_');
+    }
+}
+
+if (!function_exists('api_payload_value')) {
+    function api_payload_value(array $payload, array $aliases, mixed $default = null): mixed
+    {
+        foreach ($aliases as $alias) {
+            if (array_key_exists($alias, $payload)) {
+                return $payload[$alias];
+            }
+        }
+
+        $normalizedPayload = [];
+        foreach ($payload as $key => $value) {
+            $normalizedKey = api_normalize_payload_key((string) $key);
+            if ($normalizedKey !== '' && !array_key_exists($normalizedKey, $normalizedPayload)) {
+                $normalizedPayload[$normalizedKey] = $value;
+            }
+        }
+
+        foreach ($aliases as $alias) {
+            $normalizedAlias = api_normalize_payload_key((string) $alias);
+            if ($normalizedAlias !== '' && array_key_exists($normalizedAlias, $normalizedPayload)) {
+                return $normalizedPayload[$normalizedAlias];
+            }
+        }
+
+        return $default;
+    }
+}
+
 if (!function_exists('api_fetch_one')) {
     function api_fetch_one(PDO $db, string $sql, array $params = []): ?array
     {
@@ -299,8 +337,12 @@ if (!function_exists('api_quote_identifier')) {
 if (!function_exists('api_table_columns')) {
     function api_table_columns(PDO $db, string $table): array
     {
-        static $cache = [];
         $cacheKey = spl_object_id($db) . ':' . $table;
+        if (!isset($GLOBALS['api_table_columns_cache']) || !is_array($GLOBALS['api_table_columns_cache'])) {
+            $GLOBALS['api_table_columns_cache'] = [];
+        }
+
+        $cache =& $GLOBALS['api_table_columns_cache'];
 
         if (isset($cache[$cacheKey])) {
             return $cache[$cacheKey];
@@ -318,6 +360,27 @@ if (!function_exists('api_table_columns')) {
         ));
 
         return $cache[$cacheKey];
+    }
+}
+
+if (!function_exists('api_clear_table_columns_cache')) {
+    function api_clear_table_columns_cache(PDO $db, ?string $table = null): void
+    {
+        if (!isset($GLOBALS['api_table_columns_cache']) || !is_array($GLOBALS['api_table_columns_cache'])) {
+            return;
+        }
+
+        $prefix = spl_object_id($db) . ':';
+        if ($table !== null) {
+            unset($GLOBALS['api_table_columns_cache'][$prefix . $table]);
+            return;
+        }
+
+        foreach (array_keys($GLOBALS['api_table_columns_cache']) as $cacheKey) {
+            if (str_starts_with((string) $cacheKey, $prefix)) {
+                unset($GLOBALS['api_table_columns_cache'][$cacheKey]);
+            }
+        }
     }
 }
 
@@ -438,6 +501,7 @@ if (!function_exists('api_upload_directories')) {
         return [
             'news' => $uploadsBase . '/news',
             'members' => $uploadsBase . '/members',
+            'member_applications' => $uploadsBase . '/member_applications',
             'videos' => $uploadsBase . '/videos',
             'videos_thumbnail' => $uploadsBase . '/videos_thumbnail',
             'magna_carta' => $uploadsBase . '/magna_carta',
@@ -472,6 +536,9 @@ if (!function_exists('api_storage_groups')) {
             ],
             'members' => [
                 $uploads['members'],
+            ],
+            'member_applications' => [
+                $uploads['member_applications'],
             ],
             'national-officers' => [
                 $uploads['national-officers'],
@@ -737,6 +804,7 @@ if (!function_exists('api_allowed_extensions_for_group')) {
     {
         return match ($group) {
             'news' => api_image_extensions(),
+            'member_applications' => api_image_extensions(),
             'videos' => api_video_extensions(),
             'videos_thumbnail' => api_image_extensions(),
             'magna_carta' => api_image_extensions(),
@@ -807,6 +875,7 @@ if (!function_exists('api_image_upload_options')) {
     {
         return match ($group) {
             'members' => ['max_width' => 900, 'max_height' => 900, 'quality' => 82],
+            'member_applications' => ['max_width' => 1400, 'max_height' => 1400, 'quality' => 82],
             'videos_thumbnail' => ['max_width' => 1280, 'max_height' => 720, 'quality' => 80],
             'news', 'event_media', 'magna_carta' => ['max_width' => 1600, 'max_height' => 1200, 'quality' => 82],
             'governors', 'past-leaders', 'media' => ['max_width' => 1200, 'max_height' => 1200, 'quality' => 82],
@@ -1369,6 +1438,295 @@ if (!function_exists('api_member_media_groups')) {
     function api_member_media_groups(): array
     {
         return ['members', 'media'];
+    }
+}
+
+if (!function_exists('api_ensure_member_regional_position_column')) {
+    function api_ensure_member_regional_position_column(PDO $db): void
+    {
+        api_member_regional_position_column($db);
+    }
+}
+
+if (!function_exists('api_member_regional_position_column')) {
+    function api_member_regional_position_column(PDO $db): ?string
+    {
+        if (!api_table_exists($db, 'user_info')) {
+            return null;
+        }
+
+        $existingColumn = api_first_column($db, 'user_info', [
+            'regional_position',
+            'eagles_regional_position',
+        ]);
+        if ($existingColumn !== null) {
+            api_ensure_member_regional_position_column_size($db, $existingColumn);
+            return $existingColumn;
+        }
+
+        api_execute($db, '
+            ALTER TABLE user_info
+            ADD COLUMN regional_position VARCHAR(100) NOT NULL DEFAULT "" AFTER eagles_position
+        ');
+        api_clear_table_columns_cache($db, 'user_info');
+
+        return 'regional_position';
+    }
+}
+
+if (!function_exists('api_ensure_member_regional_position_column_size')) {
+    function api_ensure_member_regional_position_column_size(PDO $db, string $column): void
+    {
+        $definition = api_fetch_one($db, '
+            SELECT COLUMN_TYPE, IS_NULLABLE
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = :table
+              AND column_name = :column
+            LIMIT 1
+        ', [
+            ':table' => 'user_info',
+            ':column' => $column,
+        ]);
+
+        if ($definition === null) {
+            return;
+        }
+
+        $columnType = strtolower((string) ($definition['COLUMN_TYPE'] ?? ''));
+        if (!preg_match('/^varchar\((\d+)\)$/', $columnType, $matches)) {
+            return;
+        }
+
+        if ((int) ($matches[1] ?? 0) >= 100) {
+            return;
+        }
+
+        $nullSql = strtoupper((string) ($definition['IS_NULLABLE'] ?? 'YES')) === 'NO'
+            ? "NOT NULL DEFAULT ''"
+            : 'NULL DEFAULT NULL';
+
+        api_execute(
+            $db,
+            'ALTER TABLE user_info
+             MODIFY COLUMN ' . api_quote_identifier($column) . ' VARCHAR(100) ' . $nullSql
+        );
+        api_clear_table_columns_cache($db, 'user_info');
+    }
+}
+
+if (!function_exists('api_member_regional_position_select')) {
+    function api_member_regional_position_select(PDO $db, string $alias = 'api_regional_position'): string
+    {
+        api_member_regional_position_column($db);
+
+        $columns = api_table_columns($db, 'user_info');
+        $selectParts = [];
+
+        foreach (['regional_position', 'eagles_regional_position'] as $column) {
+            if (in_array($column, $columns, true)) {
+                $selectParts[] = 'NULLIF(' . api_quote_identifier($column) . ', "")';
+            }
+        }
+
+        if ($selectParts === []) {
+            return 'NULL AS ' . api_quote_identifier($alias);
+        }
+
+        if (count($selectParts) === 1) {
+            return $selectParts[0] . ' AS ' . api_quote_identifier($alias);
+        }
+
+        return 'COALESCE(' . implode(', ', $selectParts) . ') AS ' . api_quote_identifier($alias);
+    }
+}
+
+if (!function_exists('api_member_regional_position_value')) {
+    function api_member_regional_position_value(array $row): string
+    {
+        foreach (['api_regional_position', 'regional_position', 'eagles_regional_position'] as $key) {
+            $value = trim((string) ($row[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+}
+
+if (!function_exists('api_save_member_regional_position')) {
+    function api_save_member_regional_position(PDO $db, string $memberId, string $regionalPosition): array
+    {
+        $memberId = trim($memberId);
+        $regionalPosition = trim($regionalPosition);
+        $column = api_member_regional_position_column($db);
+
+        if ($memberId === '' || $regionalPosition === '' || $column === null) {
+            throw new RuntimeException('Regional position save received incomplete data.');
+        }
+
+        $columnSql = api_quote_identifier($column);
+        api_execute($db, '
+            UPDATE user_info
+            SET ' . $columnSql . ' = :regional_position
+            WHERE eagles_id = :eagles_id
+        ', [
+            ':eagles_id' => $memberId,
+            ':regional_position' => $regionalPosition,
+        ]);
+
+        $saved = api_fetch_one($db, '
+            SELECT ' . $columnSql . ' AS saved_regional_position
+            FROM user_info
+            WHERE eagles_id = :eagles_id
+            LIMIT 1
+        ', [':eagles_id' => $memberId]);
+
+        $savedValue = trim((string) ($saved['saved_regional_position'] ?? ''));
+        if ($savedValue !== $regionalPosition) {
+            throw new RuntimeException(
+                'Regional position did not persist. Column=' . $column
+                . ' Expected=' . $regionalPosition
+                . ' Saved=' . $savedValue
+            );
+        }
+
+        return [
+            'column' => $column,
+            'value' => $savedValue,
+        ];
+    }
+}
+
+if (!function_exists('api_lookup_key')) {
+    function api_lookup_key(string $value): string
+    {
+        $normalized = strtoupper(trim($value));
+        $normalized = preg_replace('/\s+/', ' ', $normalized);
+
+        return (string) $normalized;
+    }
+}
+
+if (!function_exists('api_ensure_region_club_catalog')) {
+    function api_ensure_region_club_catalog(PDO $db, string $region, string $club): array
+    {
+        $region = trim($region);
+        $club = trim($club);
+        $result = [
+            'ok' => false,
+            'created' => false,
+            'existing' => false,
+            'regionId' => 0,
+            'governorId' => 0,
+            'clubId' => 0,
+            'reason' => '',
+        ];
+
+        if ($region === '' || $club === '') {
+            $result['reason'] = 'Region or club is empty.';
+            return $result;
+        }
+
+        if (!api_table_exists($db, 'regions') || !api_table_exists($db, 'clubs')) {
+            $result['reason'] = 'Regions or clubs table is not available.';
+            return $result;
+        }
+
+        $regionIdColumn = api_first_column($db, 'regions', ['region_id', 'id']) ?? 'region_id';
+        $regionNameColumn = api_first_column($db, 'regions', ['region_name', 'name']) ?? 'region_name';
+        $regionGovernorIdColumn = api_first_column($db, 'regions', ['governor_id']);
+        $regionIdSql = api_quote_identifier($regionIdColumn);
+        $regionNameSql = api_quote_identifier($regionNameColumn);
+        $regionGovernorSql = $regionGovernorIdColumn !== null ? api_quote_identifier($regionGovernorIdColumn) : null;
+
+        $regionRow = api_fetch_one(
+            $db,
+            'SELECT ' . $regionIdSql . ' AS api_region_id,
+                    ' . $regionNameSql . ' AS api_region_name,
+                    ' . ($regionGovernorSql !== null ? $regionGovernorSql : 'NULL') . ' AS api_governor_id
+             FROM regions
+             WHERE UPPER(' . $regionNameSql . ') = UPPER(:region_name)
+             LIMIT 1',
+            [':region_name' => $region]
+        );
+
+        if ($regionRow === null) {
+            $result['reason'] = 'Region is not encoded yet, so the club cannot be linked to a governor.';
+            return $result;
+        }
+
+        $regionId = (int) ($regionRow['api_region_id'] ?? 0);
+        $governorId = (int) ($regionRow['api_governor_id'] ?? 0);
+        $result['regionId'] = $regionId;
+        $result['governorId'] = $governorId;
+
+        if ($regionId <= 0 || ($regionGovernorSql !== null && $governorId <= 0)) {
+            $result['reason'] = 'Region has no valid governor assignment.';
+            return $result;
+        }
+
+        $clubIdColumn = api_first_column($db, 'clubs', ['club_id', 'id']) ?? 'club_id';
+        $clubNameColumn = api_first_column($db, 'clubs', ['club_name', 'name']) ?? 'club_name';
+        $clubRegionIdColumn = api_first_column($db, 'clubs', ['region_id']);
+        $clubGovernorIdColumn = api_first_column($db, 'clubs', ['governor_id']);
+        $clubIdSql = api_quote_identifier($clubIdColumn);
+        $clubNameSql = api_quote_identifier($clubNameColumn);
+        $clubRegionSql = $clubRegionIdColumn !== null ? api_quote_identifier($clubRegionIdColumn) : null;
+        $clubGovernorSql = $clubGovernorIdColumn !== null ? api_quote_identifier($clubGovernorIdColumn) : null;
+
+        $existingWhere = 'UPPER(' . $clubNameSql . ') = UPPER(:club_name)';
+        $existingParams = [':club_name' => $club];
+        if ($clubRegionSql !== null) {
+            $existingWhere .= ' AND ' . $clubRegionSql . ' = :region_id';
+            $existingParams[':region_id'] = $regionId;
+        }
+
+        $existing = api_fetch_one(
+            $db,
+            'SELECT ' . $clubIdSql . ' AS api_club_id
+             FROM clubs
+             WHERE ' . $existingWhere . '
+             LIMIT 1',
+            $existingParams
+        );
+
+        if ($existing !== null) {
+            $result['ok'] = true;
+            $result['existing'] = true;
+            $result['clubId'] = (int) ($existing['api_club_id'] ?? 0);
+            return $result;
+        }
+
+        $insertFields = [$clubNameSql];
+        $insertValues = [':club_name'];
+        $insertParams = [':club_name' => $club];
+
+        if ($clubRegionSql !== null) {
+            $insertFields[] = $clubRegionSql;
+            $insertValues[] = ':region_id';
+            $insertParams[':region_id'] = $regionId;
+        }
+
+        if ($clubGovernorSql !== null) {
+            $insertFields[] = $clubGovernorSql;
+            $insertValues[] = ':governor_id';
+            $insertParams[':governor_id'] = $governorId;
+        }
+
+        api_execute(
+            $db,
+            'INSERT INTO clubs (' . implode(', ', $insertFields) . ')
+             VALUES (' . implode(', ', $insertValues) . ')',
+            $insertParams
+        );
+
+        $result['ok'] = true;
+        $result['created'] = true;
+        $result['clubId'] = (int) $db->lastInsertId();
+
+        return $result;
     }
 }
 

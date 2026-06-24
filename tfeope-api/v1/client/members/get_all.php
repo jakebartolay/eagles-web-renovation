@@ -3,6 +3,7 @@ require_once '../../../bootstrap.php';
 api_start();
 
 $db = api_db();
+$regionalPositionSelect = api_member_regional_position_select($db);
 
 $members = api_fetch_all($db, "
     SELECT 
@@ -13,6 +14,7 @@ $members = api_fetch_all($db, "
         eagles_position,
         eagles_club,
         eagles_region,
+        $regionalPositionSelect,
         eagles_pic,
         eagles_dateAdded
     FROM user_info
@@ -28,6 +30,8 @@ $data = array_map(function($row) {
         'lastName'  => $row['eagles_lastName'],
         'fullName'  => $row['eagles_firstName'] . ' ' . $row['eagles_lastName'],
         'position'  => $row['eagles_position'],
+        'regionalPosition' => api_member_regional_position_value($row),
+        'regional_position' => api_member_regional_position_value($row),
         'club'      => $row['eagles_club'],
         'region'    => $row['eagles_region'],
         'picUrl'    => api_media_url('media', basename($row['eagles_pic'])),

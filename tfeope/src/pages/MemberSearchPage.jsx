@@ -1,4 +1,4 @@
-import { Home, Lock, Shield, UserRound } from 'lucide-react';
+import { Camera, Home, Lock, Shield, UserRound } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import Skeleton from '@mui/material/Skeleton';
 import certifiedStamp from '../assets/certified.gif';
@@ -233,6 +233,14 @@ export default function MemberSearchPage() {
           </div>
         ) : null}
       </section>
+      {member && !profileImage ? (
+        <div className="member-search-note" role="status" aria-live="polite">
+          <Camera size={18} aria-hidden="true" />
+          <span>
+            No ID photo on file yet. Please contact the admin to have your photo uploaded.
+          </span>
+        </div>
+      ) : null}
       <button className="member-search-home-link" type="button" onClick={() => navigateTo('/')}>
         <Home size={18} />
         <span>Back to Home</span>

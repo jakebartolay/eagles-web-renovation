@@ -10,6 +10,7 @@ api_require_method('GET');
 function api_admin_role_label(int $roleId): string
 {
     return match ($roleId) {
+        0 => 'Member',
         1 => 'Super Admin',
         2 => 'Admin',
         3 => 'Maintenance',

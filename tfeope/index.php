@@ -13,7 +13,10 @@ $entryCss = $cssFiles[0] ?? null;
 
 function asset_href(string $path): string
 {
-    return htmlspecialchars('dist/assets/' . basename($path), ENT_QUOTES, 'UTF-8');
+    $scriptDir = str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '')));
+    $basePath = $scriptDir === '/' || $scriptDir === '.' ? '' : rtrim($scriptDir, '/');
+
+    return htmlspecialchars($basePath . '/dist/assets/' . basename($path), ENT_QUOTES, 'UTF-8');
 }
 ?>
 <!DOCTYPE html>

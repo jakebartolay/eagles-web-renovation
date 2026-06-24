@@ -1,4 +1,150 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+
+// ─── Member Portal Account Form ────────────────────────────────────────────
+function MemberAccountForm({ form, onFieldChange, onSubmit, onClose, submitting, lookupEndpoint }) {
+  const [lookupState, setLookupState] = useState(null) // null | { found, linked, data, error }
+  const [looking, setLooking] = useState(false)
+  const debounceRef = useRef(null)
+
+  const eaglesId = String(form?.eaglesId || '').trim().toUpperCase()
+
+  // Auto-lookup when Eagles ID looks complete (TFOEPE + 8 digits)
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!/^TFOEPE[0-9]{8}$/.test(eaglesId)) {
+      setLookupState(null)
+      return
+    }
+    debounceRef.current = setTimeout(() => {
+      setLooking(true)
+      setLookupState(null)
+      fetch(`${lookupEndpoint}?id=${encodeURIComponent(eaglesId)}`, {
+        credentials: 'include',
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data?.ok && data?.found) {
+            setLookupState({ found: true, linked: data.linked, data: data.data })
+            // Auto-fill name is shown read-only; no field change needed
+          } else {
+            setLookupState({ found: false, error: data?.message || 'Eagles ID not found.' })
+          }
+        })
+        .catch(() => setLookupState({ found: false, error: 'Network error during lookup.' }))
+        .finally(() => setLooking(false))
+    }, 500)
+  }, [eaglesId, lookupEndpoint])
+
+  const memberData = lookupState?.found ? lookupState.data : null
+  const alreadyLinked = lookupState?.linked === true
+
+  return (
+    <form onSubmit={onSubmit} className="admin-modal-form">
+      <div className="admin-modal-note">
+        <span>Member Portal Account</span>
+        <small>The Eagles ID must exist in member records. Name is auto-filled from the database.</small>
+      </div>
+
+      <div className="admin-modal-grid">
+        {/* Eagles ID */}
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label className="admin-field-label">Eagles ID</label>
+          <input
+            type="text"
+            placeholder="e.g. TFOEPE00000001"
+            value={form?.eaglesId || ''}
+            onChange={(e) => onFieldChange('eaglesId', e.target.value.toUpperCase())}
+            style={{ textTransform: 'uppercase' }}
+            required
+          />
+          {looking && (
+            <small style={{ color: '#64748b', marginTop: 4, display: 'block' }}>
+              <i className="fas fa-circle-notch fa-spin" style={{ marginRight: 4 }} />
+              Verifying…
+            </small>
+          )}
+          {lookupState && !looking && lookupState.found && (
+            <small style={{ color: alreadyLinked ? '#b45309' : '#15803d', marginTop: 4, display: 'block' }}>
+              <i className={`fas ${alreadyLinked ? 'fa-triangle-exclamation' : 'fa-circle-check'}`} style={{ marginRight: 4 }} />
+              {alreadyLinked
+                ? `${memberData?.fullName || eaglesId} already has a portal account.`
+                : `Found: ${memberData?.fullName || eaglesId} — ${memberData?.status || ''} · ${memberData?.club || ''}`}
+            </small>
+          )}
+          {lookupState && !looking && !lookupState.found && (
+            <small style={{ color: '#b91c1c', marginTop: 4, display: 'block' }}>
+              <i className="fas fa-circle-xmark" style={{ marginRight: 4 }} />
+              {lookupState.error}
+            </small>
+          )}
+        </div>
+
+        {/* Member name — read-only, auto-filled */}
+        {memberData && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <label className="admin-field-label">Member Name (auto-filled)</label>
+            <input type="text" value={memberData.fullName || ''} readOnly style={{ background: '#f8fafc' }} />
+          </div>
+        )}
+
+        {/* Username */}
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label className="admin-field-label">Username</label>
+          <input
+            type="text"
+            placeholder="4–20 chars, letters/numbers/underscore"
+            autoComplete="off"
+            value={form?.username || ''}
+            onChange={(e) => onFieldChange('username', e.target.value)}
+            required
+          />
+        </div>
+
+        {/* Password */}
+        <div>
+          <label className="admin-field-label">Password</label>
+          <input
+            type="password"
+            placeholder="Minimum 8 characters"
+            autoComplete="new-password"
+            value={form?.password || ''}
+            onChange={(e) => onFieldChange('password', e.target.value)}
+            required
+          />
+        </div>
+
+        {/* Confirm password */}
+        <div>
+          <label className="admin-field-label">Confirm Password</label>
+          <input
+            type="password"
+            placeholder="Retype password"
+            autoComplete="new-password"
+            value={form?.passwordConfirm || ''}
+            onChange={(e) => onFieldChange('passwordConfirm', e.target.value)}
+            required
+          />
+        </div>
+      </div>
+
+      <div className="admin-modal-actions">
+        <button type="button" className="admin-secondary-button" onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="admin-primary-button"
+          disabled={submitting || alreadyLinked || !lookupState?.found}
+        >
+          <i className={`fas ${submitting ? 'fa-circle-notch fa-spin' : 'fa-user-plus'}`} aria-hidden="true" />
+          {submitting ? 'Creating…' : 'Create Account'}
+        </button>
+      </div>
+    </form>
+  )
+}
+// ──────────────────────────────────────────────────────────────────────────
 
 const modalCopy = {
   news: {
@@ -108,6 +254,12 @@ const modalCopy = {
     title: 'Edit User',
     subtitle: 'Update role and account details.',
     submitLabel: 'Update User',
+  },
+  memberAccount: {
+    eyebrow: 'Member Directory',
+    title: 'Create Member Portal Account',
+    subtitle: 'Enter the Eagles ID to verify the member, then set a username and password for portal login.',
+    submitLabel: 'Create Account',
   },
   memorandum: {
     eyebrow: 'Document Center',
@@ -241,6 +393,7 @@ function MemberPreview({ memberForm, isEditingMember }) {
   const status = String(memberForm?.status || 'ACTIVE').trim() || 'ACTIVE'
   const club = String(memberForm?.club || '').trim() || 'Club not set'
   const region = String(memberForm?.region || '').trim() || 'Region not set'
+  const regionalPosition = String(memberForm?.regional_position || memberForm?.regionalPosition || '').trim() || 'Regional position not set'
 
   return (
     <aside className="member-editor-preview">
@@ -261,6 +414,7 @@ function MemberPreview({ memberForm, isEditingMember }) {
         </span>
         <div className="admin-modal-pill-row">
           <span className="admin-modal-pill">{status}</span>
+          <span className="admin-modal-pill">{regionalPosition}</span>
           <span className="admin-modal-pill">{club}</span>
           <span className="admin-modal-pill">{region}</span>
         </div>
@@ -273,7 +427,7 @@ function CsvTemplateNote({ file }) {
   return (
     <div className="csv-template-preview">
       <span className="csv-template-preview__label">Required CSV layout</span>
-      <code>ID,First Name,Last Name,Position,Club,Region,Status</code>
+      <code>ID,First Name,Last Name,Position,Regional Position,Club,Region,Status</code>
       <small>
         Duplicate member IDs are skipped. Optional photos must use the member ID as filename.
       </small>
@@ -989,6 +1143,10 @@ export default function ActionModal({
   onUserFieldChange,
   onMemorandumFieldChange,
   onMagnaCartaFieldChange,
+  memberAccountForm,
+  onMemberAccountFieldChange,
+  onMemberAccountSubmit,
+  memberAccountLookupEndpoint,
   submitting,
   regions = [],
   regionClubMap = {},
@@ -1898,6 +2056,16 @@ export default function ActionModal({
                   />
                 </Field>
 
+                <Field label="Regional position">
+                  <input
+                    type="text"
+                    placeholder="Regional position"
+                    value={memberForm?.regional_position || ''}
+                    onChange={(event) => onMemberFieldChange('regional_position', event.target.value)}
+                    required
+                  />
+                </Field>
+
                 <Field label="Photo upload">
                   <input
                     type="file"
@@ -2057,20 +2225,26 @@ export default function ActionModal({
 
               <Field label="Role">
                 <select
-                  value={userForm?.roleId || '2'}
+                  value={userForm?.roleId ?? '2'}
                   onChange={(event) => onUserFieldChange('roleId', event.target.value)}
                 >
+                  <option value="0">Member (Portal Access)</option>
                   <option value="2">Admin</option>
                   <option value="1">Super Admin</option>
                 </select>
               </Field>
 
-              <Field label="Eagles ID" helper="Optional staff or member reference ID.">
+              <Field
+                label="Eagles ID"
+                helper={Number(userForm?.roleId) === 0 ? 'Required for Member accounts — must exist in member records.' : 'Optional staff or member reference ID.'}
+              >
                 <input
                   type="text"
-                  placeholder="Optional Eagles ID"
+                  placeholder={Number(userForm?.roleId) === 0 ? 'e.g. TFOEPE00000001 (required)' : 'Optional Eagles ID'}
                   value={userForm?.eaglesId || ''}
-                  onChange={(event) => onUserFieldChange('eaglesId', event.target.value)}
+                  onChange={(event) => onUserFieldChange('eaglesId', event.target.value.toUpperCase())}
+                  required={Number(userForm?.roleId) === 0}
+                  style={{ textTransform: 'uppercase' }}
                 />
               </Field>
 
@@ -2110,6 +2284,17 @@ export default function ActionModal({
               </button>
             </div>
           </form>
+        )}
+
+        {mode === 'memberAccount' && (
+          <MemberAccountForm
+            form={memberAccountForm}
+            onFieldChange={onMemberAccountFieldChange}
+            onSubmit={onMemberAccountSubmit}
+            onClose={onClose}
+            submitting={submitting}
+            lookupEndpoint={memberAccountLookupEndpoint}
+          />
         )}
 
         {(mode === 'memorandum' || mode === 'editMemorandum') && (

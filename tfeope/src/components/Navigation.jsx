@@ -1,13 +1,16 @@
 import { ChevronDown, Menu, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { openForumApp } from '../lib/forumAppUrl';
 
 const navItems = [
+  { path: '/membership/application', label: 'ID Application' },
   { path: '/clubs', label: 'Regional Clubs' },
+  { path: '/forum', label: 'Forum', forumPath: '/forum' },
 ];
 const OFFICERS_DROPDOWN_ITEMS = [
-  { path: '/officers/national', label: 'National Officers (current)' },
-  { path: '/officers/governors', label: 'Governors (current)' },
-  { path: '/officers/appointed', label: 'Appointed Officers (current)' },
+  { path: '/officers/national', label: 'National Officers' },
+  { path: '/officers/governors', label: 'Governors' },
+  { path: '/officers/appointed', label: 'Appointed Officers' },
   { path: '/officers/past-leaders', label: 'Past Leaders / Leadership History' },
 ];
 
@@ -21,7 +24,18 @@ export default function Navigation({ currentPath, onNavigate, menuOpen, setMenuO
   const officersDropdownRef = useRef(null);
   const isAboutRoute = currentPath === '/history' || currentPath === '/magna-carta';
   const isUpdatesRoute = currentPath === '/news' || currentPath === '/events' || currentPath === '/videos';
-  const isOfficersRoute = currentPath === '/officers' || currentPath.startsWith('/officers/');
+  const isRegionalClubsRoute =
+    currentPath === '/clubs' ||
+    currentPath.startsWith('/clubs/') ||
+    currentPath === '/regional-clubs' ||
+    currentPath.startsWith('/regional-clubs/') ||
+    currentPath.startsWith('/officers/governors/');
+  const isOfficersRoute =
+    currentPath === '/officers' ||
+    currentPath === '/officers/national' ||
+    currentPath === '/officers/governors' ||
+    currentPath === '/officers/appointed' ||
+    currentPath === '/officers/past-leaders';
 
   useEffect(() => {
     const handleScroll = () => {
@@ -50,12 +64,18 @@ export default function Navigation({ currentPath, onNavigate, menuOpen, setMenuO
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, []);
 
-  const handleNavClick = (path) => {
-    onNavigate(path);
+  const handleNavClick = (path, forumPath) => {
     setMenuOpen(false);
     setAboutOpen(false);
     setUpdatesOpen(false);
     setOfficersOpen(false);
+
+    if (forumPath) {
+      openForumApp(forumPath);
+      return;
+    }
+
+    onNavigate(path);
   };
 
   return (
@@ -148,11 +168,11 @@ export default function Navigation({ currentPath, onNavigate, menuOpen, setMenuO
                 ))}
               </div>
             </div>
-            {navItems.map(({ path, label }) => (
+            {navItems.map(({ path, label, forumPath }) => (
               <button
                 key={path}
-                onClick={() => handleNavClick(path)}
-                className={`nav-link ${currentPath === path ? 'active' : ''}`}
+                onClick={() => handleNavClick(path, forumPath)}
+                className={`nav-link ${path === '/clubs' ? (isRegionalClubsRoute ? 'active' : '') : currentPath === path ? 'active' : ''}`}
               >
                 <span>{label}</span>
               </button>

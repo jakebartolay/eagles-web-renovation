@@ -60,11 +60,17 @@ function resolveUserRoleLabel(item) {
     return roleLabel
   }
 
-  return resolveUserRoleId(item) === 1 ? 'Super Admin' : 'Admin'
+  const roleId = resolveUserRoleId(item)
+  if (roleId === 0) return 'Member'
+  if (roleId === 1) return 'Super Admin'
+  return 'Admin'
 }
 
 function userRoleTone(item) {
-  return resolveUserRoleId(item) === 1 ? 'danger' : 'info'
+  const roleId = resolveUserRoleId(item)
+  if (roleId === 0) return 'positive'
+  if (roleId === 1) return 'danger'
+  return 'info'
 }
 
 function userAccessSummary(item, currentUserId) {
@@ -89,6 +95,10 @@ function resolveMemberPhoto(item) {
 }
 
 function resolveMemberField(item, field) {
+  if (field === 'regionalPosition') {
+    return String(item?.regionalPosition || item?.regional_position || item?.eagles_regional_position || '').trim()
+  }
+
   return String(item?.[field] || item?.[`eagles_${field}`] || '').trim()
 }
 
@@ -450,6 +460,7 @@ export function MembersPage({
                 <th>ID</th>
                 <th>Member</th>
                 <th>Position</th>
+                <th>Regional Position</th>
                 <th>Club</th>
                 <th>Region</th>
                 <th>Status</th>
@@ -461,6 +472,7 @@ export function MembersPage({
                 const name = displayName(item)
                 const memberId = resolveMemberId(item)
                 const position = resolveMemberField(item, 'position') || 'No position'
+                const regionalPosition = resolveMemberField(item, 'regionalPosition') || 'Not set'
                 const club = resolveMemberField(item, 'club') || 'Club not set'
                 const region = resolveMemberField(item, 'region') || 'Region not set'
                 const status = resolveMemberStatus(item)
@@ -477,6 +489,7 @@ export function MembersPage({
                       </div>
                     </td>
                     <td data-label="Position">{position}</td>
+                    <td data-label="Regional Position">{regionalPosition}</td>
                     <td data-label="Club">{club}</td>
                     <td data-label="Region">{region}</td>
                     <td data-label="Status">
@@ -566,6 +579,7 @@ export function UsersPage({
   loading = false,
   isSuperAdmin = false,
   onCreateUser,
+  onCreateMemberAccount,
   onEditUser,
   onDeleteUser,
 }) {
@@ -635,10 +649,16 @@ export function UsersPage({
         },
       ]}
       actions={isSuperAdmin ? (
-        <button type="button" className="admin-primary-button" onClick={onCreateUser}>
-          <i className="fas fa-user-plus" aria-hidden="true"></i>
-          Create User
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button type="button" className="admin-secondary-button" onClick={onCreateMemberAccount}>
+            <i className="fas fa-id-card" aria-hidden="true"></i>
+            Create Member Account
+          </button>
+          <button type="button" className="admin-primary-button" onClick={onCreateUser}>
+            <i className="fas fa-user-plus" aria-hidden="true"></i>
+            Create Admin User
+          </button>
+        </div>
       ) : null}
     >
       {!filteredItems.length ? (

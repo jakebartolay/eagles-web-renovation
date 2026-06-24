@@ -1,33 +1,54 @@
 <?php
 require_once '../../../bootstrap.php';
+require_once __DIR__ . '/../users/_avatar_helpers.php';
 api_start();
 api_require_method('POST');
 
 $db = api_db();
+user_ensure_avatar_columns($db);
 $payload = api_request_data();
 
-$username = trim((string) ($payload['username'] ?? ''));
+$credential = trim((string) (
+    $payload['username']
+    ?? $payload['eaglesId']
+    ?? $payload['memberId']
+    ?? $payload['id']
+    ?? ''
+));
 $password = (string) ($payload['password'] ?? '');
 
-if ($username === '' || $password === '') {
+if ($credential === '' || $password === '') {
     api_error('Please enter your username and password.');
 }
 
+$eaglesId = strtoupper($credential);
+
 $user = api_fetch_one($db, '
-    SELECT id, name, username, password_hash, role_id
+    SELECT id, name, username, eagles_id, password_hash, role_id, avatar_seed, avatar_style
     FROM users
-    WHERE username = :username
+    WHERE username = :credential
+       OR eagles_id = :eagles_id
     LIMIT 1
-', [':username' => $username]);
+', [
+    ':credential' => $credential,
+    ':eagles_id' => $eaglesId,
+]);
 
 if (!$user || !password_verify($password, (string) ($user['password_hash'] ?? ''))) {
     api_error('Invalid username or password.', 401);
 }
 
+$roleId = (int) ($user['role_id'] ?? 0);
+
+if (in_array($roleId, [1, 2], true)) {
+    api_error('Admin accounts should sign in through the admin dashboard.', 403);
+}
+
 $_SESSION['user_id'] = (int) ($user['id'] ?? 0);
 $_SESSION['user_name'] = (string) ($user['name'] ?? '');
 $_SESSION['username'] = (string) ($user['username'] ?? '');
-$_SESSION['role_id'] = (int) ($user['role_id'] ?? 0);
+$_SESSION['eagles_id'] = (string) ($user['eagles_id'] ?? '');
+$_SESSION['role_id'] = $roleId;
 
 api_json([
     'success' => true,
@@ -36,6 +57,9 @@ api_json([
         'id' => (int) ($user['id'] ?? 0),
         'name' => (string) ($user['name'] ?? ''),
         'username' => (string) ($user['username'] ?? ''),
-        'roleId' => (int) ($user['role_id'] ?? 0),
+        'eaglesId' => (string) ($user['eagles_id'] ?? ''),
+        'roleId' => $roleId,
+        'avatarSeed' => user_avatar_seed($user),
+        'avatarStyle' => user_avatar_style($user['avatar_style'] ?? null),
     ],
 ]);

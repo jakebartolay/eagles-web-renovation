@@ -8,6 +8,8 @@ export const API_ENDPOINTS = {
     session: '/v1/client/auth/session.php',
     login: '/v1/client/auth/login.php',
     signup: '/v1/client/auth/signup.php',
+    logout: '/v1/client/auth/logout.php',
+    linkEaglesId: '/v1/client/auth/link_eagles_id.php',
   },
   news: '/v1/client/news/get_all.php',
   videos: '/v1/client/videos/get_all.php',
