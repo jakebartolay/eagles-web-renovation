@@ -29,7 +29,7 @@ import { API_ENDPOINTS, fetchApiJson, postJson } from './api';
 import forumStylesUrl from './styles.css?url';
 
 const ROUTE_EVENT = 'app:navigate';
-const LOCAL_BASE_PATH = '/forum';
+const LOCAL_BASE_PATHS = ['/tfeope-forum', '/forum'];
 const ADMIN_ROLE_IDS = new Set([1, 2]);
 const FORUM_STYLESHEET_ID = 'tfeope-forum-styles';
 
@@ -69,12 +69,68 @@ function sortThreads(threads) {
   });
 }
 
+function normalizeThreadReply(post) {
+  const author = post?.author || {};
+
+  return {
+    id: Number(post?.id) || 0,
+    authorId: Number(author.id) || 0,
+    author: author.name || author.username || 'Member',
+    authorUsername: author.username || '',
+    authorRoleId: Number(author.roleId) || 0,
+    authorIsMember: Boolean(author.isMember),
+    authorClub: author.club || null,
+    authorAvatarSeed: author.avatarSeed || '',
+    authorAvatarStyle: author.avatarStyle || '',
+    body: post?.body || '',
+    parentPostId: post?.parentPostId || null,
+    createdAt: post?.createdAt || '',
+    likes: Number(post?.likeCount) || 0,
+  };
+}
+
+function normalizeThreadDetail(payload) {
+  const thread = payload?.thread || {};
+  const author = thread.author || {};
+  const replies = Array.isArray(payload?.posts) ? payload.posts.map(normalizeThreadReply) : [];
+
+  return {
+    id: Number(thread.id) || 0,
+    categoryId: Number(thread.categoryId) || 0,
+    category: thread.categorySlug || '',
+    categoryName: thread.categoryName || '',
+    title: thread.title || '',
+    slug: thread.slug || '',
+    authorId: Number(author.id) || 0,
+    author: author.name || author.username || 'Member',
+    authorUsername: author.username || '',
+    authorRoleId: Number(author.roleId) || 0,
+    authorIsMember: Boolean(author.isMember),
+    authorClub: author.club || null,
+    authorAvatarSeed: author.avatarSeed || '',
+    authorAvatarStyle: author.avatarStyle || '',
+    body: thread.body || '',
+    image: thread.image || null,
+    pinned: Boolean(thread.isPinned),
+    locked: Boolean(thread.isLocked),
+    views: Number(thread.views) || 0,
+    replyCount: Number(thread.replyCount) || replies.length,
+    approveCount: Number(thread.approveCount) || 0,
+    disapproveCount: Number(thread.disapproveCount) || 0,
+    myReaction: thread.myReaction || null,
+    createdAt: thread.createdAt || '',
+    replies,
+    detailsLoaded: true,
+  };
+}
+
 function getBasePath() {
   if (typeof window === 'undefined') {
     return '';
   }
 
-  return window.location.pathname.toLowerCase().startsWith(LOCAL_BASE_PATH) ? LOCAL_BASE_PATH : '';
+  const currentPath = window.location.pathname.toLowerCase();
+  return LOCAL_BASE_PATHS.find((basePath) => currentPath === basePath || currentPath.startsWith(`${basePath}/`)) || '';
 }
 
 function normalizePath(path) {
@@ -967,6 +1023,7 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
   const [replyForm, setReplyForm] = useState(REPLY_FORM);
   const [feedback, setFeedback] = useState('');
   const [loadingForum, setLoadingForum] = useState(true);
+  const [loadingThreadId, setLoadingThreadId] = useState('');
   const [submittingThread, setSubmittingThread] = useState(false);
   const [submittingReply, setSubmittingReply] = useState(false);
 
@@ -1002,7 +1059,12 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
       .then(([categoriesPayload, threadsPayload]) => {
         if (cancelled) return;
         const nextCategories = Array.isArray(categoriesPayload?.data) ? categoriesPayload.data : [];
-        const nextThreads = sortThreads(Array.isArray(threadsPayload?.data) ? threadsPayload.data : []);
+        const nextThreads = sortThreads(
+          (Array.isArray(threadsPayload?.data) ? threadsPayload.data : []).map((thread) => ({
+            ...thread,
+            detailsLoaded: Array.isArray(thread.replies) && thread.replies.length > 0,
+          })),
+        );
 
         setCategories(nextCategories);
         setThreads(nextThreads);
@@ -1071,6 +1133,63 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
     [threads],
   );
 
+  const selectedThreadDetailId = selectedThread?.id || '';
+  const selectedThreadDetailsLoaded = Boolean(selectedThread?.detailsLoaded);
+
+  useEffect(() => {
+    if (!selectedThreadDetailId || selectedThreadDetailsLoaded) {
+      return undefined;
+    }
+
+    let cancelled = false;
+    setLoadingThreadId(String(selectedThreadDetailId));
+
+    fetchApiJson(`${API_ENDPOINTS.forum.thread}?id=${encodeURIComponent(selectedThreadDetailId)}&trackView=0`)
+      .then((payload) => {
+        if (cancelled) return;
+
+        const threadDetail = normalizeThreadDetail(payload);
+        if (!threadDetail.id) return;
+
+        setThreads((current) =>
+          sortThreads(
+            current.map((thread) =>
+              thread.id === threadDetail.id
+                ? {
+                    ...thread,
+                    ...threadDetail,
+                    views: Math.max(Number(thread.views) || 0, Number(threadDetail.views) || 0),
+                  }
+                : thread,
+            ),
+          ),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setThreads((current) =>
+            current.map((thread) =>
+              thread.id === selectedThreadDetailId
+                ? {
+                    ...thread,
+                    detailsLoaded: true,
+                  }
+                : thread,
+            ),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingThreadId('');
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedThreadDetailId, selectedThreadDetailsLoaded]);
+
   const updateThreadForm = (field, value) => {
     setThreadForm((current) => ({ ...current, [field]: value }));
   };
@@ -1104,7 +1223,7 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
       const nextThread = payload?.data;
 
       if (nextThread) {
-        setThreads((current) => sortThreads([nextThread, ...current]));
+        setThreads((current) => sortThreads([{ ...nextThread, detailsLoaded: true }, ...current]));
         setSelectedThreadId(nextThread.id);
       }
 
@@ -1170,6 +1289,7 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
                 ? {
                     ...thread,
                     replies: [...(thread.replies || []), nextReply],
+                    detailsLoaded: true,
                     replyCount: (Number(thread.replyCount) || (thread.replies || []).length) + 1,
                     lastReplyAt: nextReply.createdAt,
                   }
@@ -1345,7 +1465,9 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
 
                   <div className="reply-list">
                     <h3>Replies</h3>
-                    {selectedThread.replies.length > 0 ? (
+                    {loadingThreadId === String(selectedThread.id) ? (
+                      <p className="no-replies">Loading replies...</p>
+                    ) : selectedThread.replies.length > 0 ? (
                       selectedThread.replies.map((reply) => (
                         <div className="reply-item" key={reply.id}>
                           <div className="reply-avatar">{getMemberInitials(reply.author)}</div>

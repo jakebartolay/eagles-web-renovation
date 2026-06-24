@@ -14,6 +14,7 @@ export const API_ENDPOINTS = {
   },
   forum: {
     categories: '/v1/client/forum/categories.php',
+    thread: '/v1/client/forum/thread.php',
     threads: '/v1/client/forum/threads.php',
     posts: '/v1/client/forum/posts.php',
     views: '/v1/client/forum/views.php',

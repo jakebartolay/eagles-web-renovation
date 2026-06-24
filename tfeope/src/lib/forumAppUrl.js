@@ -1,6 +1,6 @@
 const getDefaultForumAppUrl = () => {
   if (typeof window !== 'undefined' && window.location.port) {
-    return `${window.location.protocol}//${window.location.hostname}/tfeope-forum`;
+    return `${window.location.origin}/forum`;
   }
 
   return '/tfeope-forum';
@@ -12,7 +12,11 @@ export const FORUM_APP_BASE_URL = normalizeBaseUrl(import.meta.env.VITE_FORUM_AP
 
 export function forumAppUrl(path = '') {
   const cleanPath = String(path || '').replace(/^\/+/, '');
-  return cleanPath ? `${FORUM_APP_BASE_URL}/${cleanPath}` : FORUM_APP_BASE_URL;
+  const normalizedPath = /(^|\/)forum$/i.test(FORUM_APP_BASE_URL)
+    ? cleanPath.replace(/^forum(?:\/|$)/i, '')
+    : cleanPath;
+
+  return normalizedPath ? `${FORUM_APP_BASE_URL}/${normalizedPath}` : FORUM_APP_BASE_URL;
 }
 
 export function openForumApp(path = '', replace = false) {

@@ -3,6 +3,7 @@ import Footer from './components/Footer';
 import { usePathRoute } from './components/HashRouter';
 import Navigation from './components/Navigation';
 import { getPendingApiRequestCount, subscribeToApiRequestActivity } from './config/api';
+import ForumApp from './forum/ForumApp';
 import { openForumApp } from './lib/forumAppUrl';
 import {
   EventsPage,
@@ -66,7 +67,7 @@ const ROUTES = {
   '/member/login': () => <ForumRedirectPage to="/login" />,
   '/news': NewsPage,
   '/events': EventsPage,
-  '/forum': () => <ForumRedirectPage to="/forum" />,
+  '/forum': ForumApp,
   '/officers': () => <OfficersPage groupKey="national" />,
   '/officers/national': () => <OfficersPage groupKey="national" />,
   '/officers/governors': UserGovernorsPage,
@@ -114,9 +115,9 @@ const PAGE_TITLES = {
 
 const resolveRouteComponent = (path) => {
   if (ROUTES[path]) return ROUTES[path];
+  if (path.startsWith('/forum/')) return ForumApp;
   if (path === '/tfeope-forum' || path.startsWith('/tfeope-forum/')) {
-    const forumPath = path.slice('/tfeope-forum'.length) || '/forum';
-    return () => <ForumRedirectPage to={forumPath} />;
+    return ForumApp;
   }
   if (path.startsWith('/users/governors/')) return UserGovernorProfilePage;
   if (path.startsWith('/users/clubs/')) return UserClubPage;
@@ -130,6 +131,8 @@ const resolveRouteComponent = (path) => {
 
 const getPageTitle = (path) => {
   if (PAGE_TITLES[path]) return PAGE_TITLES[path];
+  if (path.startsWith('/forum/')) return 'Forum';
+  if (path === '/tfeope-forum' || path.startsWith('/tfeope-forum/')) return 'Forum';
   if (path.startsWith('/users/governors/')) return 'Governor Profile';
   if (path.startsWith('/users/clubs/')) return 'Club Members';
   if (path.startsWith('/officers/governors/')) return 'Regional Clubs';
@@ -224,6 +227,10 @@ export default function EaglesLanding() {
   const [apiBusy, setApiBusy] = useState(() => getPendingApiRequestCount() > 0);
   const { currentPath, navigate } = usePathRoute();
   const isStandalonePage =
+    currentPath === '/forum' ||
+    currentPath.startsWith('/forum/') ||
+    currentPath === '/tfeope-forum' ||
+    currentPath.startsWith('/tfeope-forum/') ||
     currentPath === '/members/member_search' ||
     currentPath.startsWith('/users') ||
     currentPath === '/member/login' ||

@@ -38,8 +38,11 @@ $thread = api_fetch_one($db, "
 
 if (!$thread) { api_error('Thread not found.', 404); }
 
-// Increment views
-api_execute($db, "UPDATE forum_threads SET views = views + 1 WHERE id = :id", [':id' => $threadId]);
+// Increment views unless the frontend is only refreshing thread details.
+$trackView = (string) ($_GET['trackView'] ?? '1') !== '0';
+if ($trackView) {
+    api_execute($db, "UPDATE forum_threads SET views = views + 1 WHERE id = :id", [':id' => $threadId]);
+}
 
 $page  = max(1, (int)($_GET['page'] ?? 1));
 $limit = 20;
