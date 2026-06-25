@@ -11,20 +11,20 @@ import {
   LogOut,
   MessageSquare,
   Pin,
-  Plus,
+  RefreshCw,
   Search,
   Send,
   Settings,
   Tag,
+  ThumbsDown,
+  ThumbsUp,
   UserPlus,
   UserRound,
-  Users,
   X,
 } from 'lucide-react';
+import Skeleton from '@mui/material/Skeleton';
 import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MemberVirtualIdCard from '../components/MemberVirtualIdCard';
-import SocialIcon from '../components/SocialIcon';
-import { SOCIAL_LINKS } from '../components/socialLinks';
 import { API_ENDPOINTS, fetchApiJson, postJson } from './api';
 import forumStylesUrl from './styles.css?url';
 
@@ -51,9 +51,41 @@ const THREAD_FORM = {
   body: '',
 };
 
-const REPLY_FORM = {
-  body: '',
-};
+const CHANGELOG_ENTRIES = [
+  {
+    badge: 'Latest',
+    date: 'June 25, 2026',
+    title: 'Community feed redesign',
+    summary: 'The forum interface was refreshed into a cleaner social feed inspired by Facebook and Reddit.',
+    changes: [
+      'Added card-style discussion feed with vote score, views, replies, and pinned labels.',
+      'Updated the composer, topic sidebar, and thread detail panel for easier scanning.',
+      'Kept the existing forum API flow intact so posts, replies, and categories still use the same backend.',
+    ],
+  },
+  {
+    badge: 'Stability',
+    date: 'June 25, 2026',
+    title: 'Forum API downtime notice',
+    summary: 'Members now see a clear warning when the API or server is not responding.',
+    changes: [
+      'Added a persistent service notice with a Retry action.',
+      'Improved empty states when live forum data cannot be loaded.',
+      'Covered load, thread detail, post, and reply failures.',
+    ],
+  },
+  {
+    badge: 'Account',
+    date: 'June 2026',
+    title: 'Member account tools',
+    summary: 'Profile, account settings, and member ID access were grouped into the forum shell.',
+    changes: [
+      'Added account menu for Profile, Settings, and Logout.',
+      'Added Eagles ID linking and member record display.',
+      'Added access to the digital member ID card when verified data is available.',
+    ],
+  },
+];
 
 function getLatestActivityTime(thread) {
   return thread.lastReplyAt || thread.replies?.[thread.replies.length - 1]?.createdAt || thread.createdAt;
@@ -67,61 +99,6 @@ function sortThreads(threads) {
 
     return new Date(getLatestActivityTime(second)).getTime() - new Date(getLatestActivityTime(first)).getTime();
   });
-}
-
-function normalizeThreadReply(post) {
-  const author = post?.author || {};
-
-  return {
-    id: Number(post?.id) || 0,
-    authorId: Number(author.id) || 0,
-    author: author.name || author.username || 'Member',
-    authorUsername: author.username || '',
-    authorRoleId: Number(author.roleId) || 0,
-    authorIsMember: Boolean(author.isMember),
-    authorClub: author.club || null,
-    authorAvatarSeed: author.avatarSeed || '',
-    authorAvatarStyle: author.avatarStyle || '',
-    body: post?.body || '',
-    parentPostId: post?.parentPostId || null,
-    createdAt: post?.createdAt || '',
-    likes: Number(post?.likeCount) || 0,
-  };
-}
-
-function normalizeThreadDetail(payload) {
-  const thread = payload?.thread || {};
-  const author = thread.author || {};
-  const replies = Array.isArray(payload?.posts) ? payload.posts.map(normalizeThreadReply) : [];
-
-  return {
-    id: Number(thread.id) || 0,
-    categoryId: Number(thread.categoryId) || 0,
-    category: thread.categorySlug || '',
-    categoryName: thread.categoryName || '',
-    title: thread.title || '',
-    slug: thread.slug || '',
-    authorId: Number(author.id) || 0,
-    author: author.name || author.username || 'Member',
-    authorUsername: author.username || '',
-    authorRoleId: Number(author.roleId) || 0,
-    authorIsMember: Boolean(author.isMember),
-    authorClub: author.club || null,
-    authorAvatarSeed: author.avatarSeed || '',
-    authorAvatarStyle: author.avatarStyle || '',
-    body: thread.body || '',
-    image: thread.image || null,
-    pinned: Boolean(thread.isPinned),
-    locked: Boolean(thread.isLocked),
-    views: Number(thread.views) || 0,
-    replyCount: Number(thread.replyCount) || replies.length,
-    approveCount: Number(thread.approveCount) || 0,
-    disapproveCount: Number(thread.disapproveCount) || 0,
-    myReaction: thread.myReaction || null,
-    createdAt: thread.createdAt || '',
-    replies,
-    detailsLoaded: true,
-  };
 }
 
 function getBasePath() {
@@ -202,6 +179,35 @@ function formatForumDate(value) {
   }).format(date);
 }
 
+function formatCompactNumber(value) {
+  return new Intl.NumberFormat('en-PH', {
+    maximumFractionDigits: 1,
+    notation: 'compact',
+  }).format(Number(value) || 0);
+}
+
+function getThreadTagClass(thread) {
+  const topic = `${thread?.category || ''} ${thread?.categoryName || ''}`.toLowerCase();
+
+  if (topic.includes('help') || topic.includes('support') || topic.includes('question')) {
+    return 'tag-help';
+  }
+
+  if (topic.includes('news') || topic.includes('announce') || topic.includes('update')) {
+    return 'tag-news';
+  }
+
+  if (topic.includes('meta') || topic.includes('system') || topic.includes('developer')) {
+    return 'tag-meta';
+  }
+
+  if (topic.includes('off')) {
+    return 'tag-off';
+  }
+
+  return 'tag-gen';
+}
+
 function getMemberInitials(name) {
   return String(name || 'Member')
     .split(/[\s,]+/)
@@ -241,6 +247,39 @@ function buildMember(session, details, loadingDetails) {
         ? 'No member status was found for this Eagles ID.'
         : 'Add your Eagles ID when ready.',
     picUrl: details?.picUrl || '',
+  };
+}
+
+function isForumServiceIssue(error) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = String(error.message || '').toLowerCase();
+
+  return (
+    message.includes('api server') ||
+    message.includes('server unavailable') ||
+    message.includes('unexpected response') ||
+    message.includes('invalid json') ||
+    message.includes('network') ||
+    message.includes('internet connection') ||
+    message.includes('service endpoint') ||
+    message.includes('unable to complete the request right now')
+  );
+}
+
+function createForumServiceNotice(error) {
+  const message = error instanceof Error ? String(error.message || '').toLowerCase() : '';
+  const offline =
+    message.includes('internet connection') ||
+    (typeof navigator !== 'undefined' && navigator.onLine === false);
+
+  return {
+    title: offline ? 'Connection offline' : 'Forum service issue',
+    message: offline
+      ? 'Your device appears to be offline. Reconnect to the internet, then retry loading the forum.'
+      : 'The forum API/server is not responding right now. Members can keep reading loaded content, but new posts and updates may be unavailable.',
   };
 }
 
@@ -392,6 +431,7 @@ function ForumApplication() {
   useEffect(() => {
     const titleByRoute = {
       '/': 'Forum',
+      '/changelogs': 'Changelogs',
       '/profile': 'Profile',
       '/settings': 'Settings',
       '/login': 'Sign In',
@@ -431,6 +471,8 @@ function ForumApplication() {
           />
         ) : route === '/settings' ? (
           <SettingsPage member={member} onUpdateAccount={handleUpdateAccount} />
+        ) : route === '/changelogs' ? (
+          <ChangelogsPage onNavigate={navigate} />
         ) : (
           <ForumPage
             isAuthenticated={isAuthenticated}
@@ -510,16 +552,78 @@ function ToastNotification({ toast, onDismiss }) {
 
 function LoadingScreen() {
   return (
-    <section className="auth-screen">
-      <div className="auth-card auth-card-small">
-        <div className="brand-lockup">
-          <img src="/logo.png" alt="TFOE-PE logo" />
-          <div>
-            <strong>Member Forum</strong>
-            <span>Checking session...</span>
-          </div>
+    <section
+      className="forum-loading-screen"
+      aria-label="Forum loading"
+      style={{ minHeight: '100vh', background: '#f5f6fa' }}
+    >
+      <header
+        className="forum-loading-topbar"
+        style={{
+          alignItems: 'center',
+          background: 'rgba(255, 255, 255, 0.96)',
+          borderBottom: '1px solid #dde2ec',
+          color: '#111827',
+          display: 'flex',
+          fontSize: '0.94rem',
+          fontWeight: 850,
+          justifyContent: 'center',
+          minHeight: 52,
+          position: 'sticky',
+          top: 0,
+          zIndex: 10,
+        }}
+      >
+        <span>Forum</span>
+      </header>
+      <main
+        className="forum-page forum-loading-page"
+        style={{
+          boxSizing: 'border-box',
+          margin: '0 auto',
+          padding: 14,
+          width: 'min(1160px, 100%)',
+        }}
+      >
+        <div
+          className="forum-workspace"
+          style={{
+            alignItems: 'start',
+            display: 'grid',
+            gap: 14,
+            gridTemplateColumns: 'minmax(0, 1fr) 248px',
+          }}
+        >
+          <section
+            className="feed"
+            aria-label="Loading forum feed"
+            style={{ display: 'flex', flexDirection: 'column', gap: 8, minWidth: 0 }}
+          >
+            <div className="pinned-strip forum-skeleton-pinned" aria-hidden="true">
+              <Skeleton animation="wave" variant="rounded" width={18} height={18} />
+              <span className="pinned-text">
+                <Skeleton animation="wave" variant="text" width="44%" sx={{ fontSize: '0.82rem' }} />
+                <Skeleton animation="wave" variant="text" width="82%" sx={{ fontSize: '0.76rem' }} />
+              </span>
+            </div>
+            <div className="thread-list feed-list">
+              {Array.from({ length: 4 }, (_, index) => (
+                <ForumPostSkeleton key={`initial-forum-post-${index}`} />
+              ))}
+            </div>
+          </section>
+
+          <aside
+            className="forum-sidebar sidebar"
+            aria-label="Loading forum sidebar"
+            style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}
+          >
+            <ForumComposerSkeleton />
+            <ForumSidebarSkeleton titleWidth="42%" rows={5} />
+            <ForumSidebarSkeleton titleWidth="52%" rows={4} />
+          </aside>
         </div>
-      </div>
+      </main>
     </section>
   );
 }
@@ -799,7 +903,9 @@ function MemberShell({
 }) {
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef(null);
-  const isForumView = !['/profile', '/settings'].includes(activeRoute);
+  const isForumRoute = activeRoute === '/';
+  const isChangelogsRoute = activeRoute === '/changelogs';
+  const showCommunityNav = isForumRoute || isChangelogsRoute || isAuthenticated;
 
   useEffect(() => {
     if (!accountMenuOpen) {
@@ -839,7 +945,7 @@ function MemberShell({
   const handleForumSearchChange = (event) => {
     onSearchChange(event.target.value);
 
-    if (!isForumView) {
+    if (!isForumRoute) {
       onNavigate('/');
     }
   };
@@ -847,34 +953,45 @@ function MemberShell({
   return (
     <div className="forum-app">
       <header className="topbar">
-        <div className="topbar-brand">
-          <img src="/logo.png" alt="TFOE-PE logo" />
-          <span>Ang Agila Forum</span>
-        </div>
+        <div className="topbar-side" aria-hidden="true" />
 
-        {isAuthenticated || isForumView ? (
+        {showCommunityNav ? (
           <nav className="topbar-nav" aria-label="Forum navigation">
-            <label className="topbar-search" htmlFor="topbar-forum-search">
-              <Search size={17} aria-hidden="true" />
-              <input
-                id="topbar-forum-search"
-                type="search"
-                value={searchQuery}
-                onChange={handleForumSearchChange}
-                placeholder="Search forum"
-              />
-            </label>
+            <button className="topbar-brand topbar-brand-center" type="button" onClick={() => onNavigate('/')}>
+              <img src="/logo.png" alt="TFOE-PE logo" />
+              <span>Ang Agila Forum</span>
+            </button>
 
-            {isAuthenticated ? (
-              <button
-                className={isForumView ? 'active' : ''}
-                type="button"
-                onClick={() => onNavigate('/')}
-              >
-                <MessageSquare size={17} />
-                <span>Forum</span>
-              </button>
+            {isForumRoute ? (
+              <label className="topbar-search" htmlFor="topbar-forum-search">
+                <Search size={17} aria-hidden="true" />
+                <input
+                  id="topbar-forum-search"
+                  type="search"
+                  value={searchQuery}
+                  onChange={handleForumSearchChange}
+                  placeholder="Search forum"
+                />
+              </label>
             ) : null}
+
+            <button
+              className={isForumRoute ? 'active' : ''}
+              type="button"
+              onClick={() => onNavigate('/')}
+            >
+              <MessageSquare size={17} />
+              <span>Feed</span>
+            </button>
+
+            <button
+              className={isChangelogsRoute ? 'active' : ''}
+              type="button"
+              onClick={() => onNavigate('/changelogs')}
+            >
+              <Settings size={17} />
+              <span>Updates</span>
+            </button>
           </nav>
         ) : null}
 
@@ -935,82 +1052,69 @@ function MemberShell({
             ) : null}
           </div>
         ) : (
-          <div className="topbar-auth">
-            <button type="button" onClick={() => onNavigate('/login')}>
-              <LogIn size={16} />
-              <span>Sign in</span>
-            </button>
-            <button className="primary" type="button" onClick={() => onNavigate('/signup')}>
-              <UserPlus size={16} />
-              <span>Sign up</span>
-            </button>
-          </div>
+          <div className="topbar-side" aria-hidden="true" />
         )}
       </header>
 
       <main>{children}</main>
-
-      <ForumFooter isAuthenticated={isAuthenticated} onNavigate={onNavigate} />
     </div>
   );
 }
 
-function ForumFooter({ isAuthenticated, onNavigate }) {
+function ChangelogsPage({ onNavigate }) {
   return (
-    <footer className="forum-footer">
-      <div className="forum-footer-main">
-        <section className="forum-footer-intro">
-          <div className="forum-footer-brand">
-            <img src="/logo.png" alt="TFOE-PE logo" />
-            <div>
-              <strong>Ang Agila Forum</strong>
-              <span>TFOE-PE Member Community</span>
-            </div>
-          </div>
+    <section className="changelog-page" aria-labelledby="changelog-title">
+      <header className="page-header changelog-header">
+        <div>
+          <span className="page-kicker">Developer Notes</span>
+          <h1 id="changelog-title">System Updates</h1>
+          <p>Latest improvements, fixes, and release notes for the Ang Agila member forum.</p>
+        </div>
+        <button className="changelog-feed-link" type="button" onClick={() => onNavigate('/')}>
+          <MessageSquare size={17} />
+          <span>Back to Feed</span>
+        </button>
+      </header>
+
+      <div className="changelog-hero-card">
+        <div>
+          <span>Release Transparency</span>
+          <strong>What changed in the system?</strong>
           <p>
-            A shared space for Philippine Eagles members to connect, exchange updates, and strengthen
-            brotherhood through service.
+            This page keeps members aware of visible updates, technical fixes, and developer-side changes that affect the
+            forum experience.
           </p>
-          <div className="forum-footer-socials" aria-label="Ang Agila social media">
-            {SOCIAL_LINKS.map(({ href, label, network }) => (
-              <a key={network} href={href} target="_blank" rel="noreferrer" aria-label={label} title={label}>
-                <SocialIcon network={network} size={18} />
-              </a>
-            ))}
-          </div>
-        </section>
-
-        <nav className="forum-footer-links" aria-label="Forum links">
-          <strong>Forum</strong>
-          <button type="button" onClick={() => onNavigate('/')}>Discussions</button>
-          <button type="button" onClick={() => onNavigate(isAuthenticated ? '/profile' : '/login')}>
-            {isAuthenticated ? 'My Profile' : 'Sign In'}
-          </button>
-          <button type="button" onClick={() => onNavigate(isAuthenticated ? '/settings' : '/signup')}>
-            {isAuthenticated ? 'Settings' : 'Create Account'}
-          </button>
-        </nav>
-
-        <nav className="forum-footer-links" aria-label="Member resources">
-          <strong>Members</strong>
-          <a href="/members/member_search">Virtual Member ID</a>
-          <a href="/membership/application">ID Application</a>
-          <a href="/clubs">Regional Clubs</a>
-        </nav>
-
-        <nav className="forum-footer-links" aria-label="Ang Agila website links">
-          <strong>Ang Agila</strong>
-          <a href="/">Main Website</a>
-          <a href="/news">News &amp; Videos</a>
-          <a href="/events">Events</a>
-        </nav>
+        </div>
+        <div className="changelog-hero-meter">
+          <CheckCircle2 size={28} />
+          <strong>{CHANGELOG_ENTRIES.length}</strong>
+          <span>published notes</span>
+        </div>
       </div>
 
-      <div className="forum-footer-bottom">
-        <p>© {new Date().getFullYear()} Ang Agila · The Fraternal Order of Eagles. All rights reserved.</p>
-        <span>Service Through Strong Brotherhood</span>
+      <div className="changelog-timeline">
+        {CHANGELOG_ENTRIES.map((entry) => (
+          <article className="changelog-card" key={`${entry.date}-${entry.title}`}>
+            <div className="changelog-card-marker" aria-hidden="true">
+              <Clock size={18} />
+            </div>
+            <div className="changelog-card-body">
+              <div className="changelog-card-topline">
+                <span>{entry.badge}</span>
+                <time>{entry.date}</time>
+              </div>
+              <h2>{entry.title}</h2>
+              <p>{entry.summary}</p>
+              <ul>
+                {entry.changes.map((change) => (
+                  <li key={change}>{change}</li>
+                ))}
+              </ul>
+            </div>
+          </article>
+        ))}
       </div>
-    </footer>
+    </section>
   );
 }
 
@@ -1020,12 +1124,11 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [selectedThreadId, setSelectedThreadId] = useState('');
   const [threadForm, setThreadForm] = useState(THREAD_FORM);
-  const [replyForm, setReplyForm] = useState(REPLY_FORM);
   const [feedback, setFeedback] = useState('');
+  const [serviceNotice, setServiceNotice] = useState(null);
   const [loadingForum, setLoadingForum] = useState(true);
-  const [loadingThreadId, setLoadingThreadId] = useState('');
+  const [forumReloadKey, setForumReloadKey] = useState(0);
   const [submittingThread, setSubmittingThread] = useState(false);
-  const [submittingReply, setSubmittingReply] = useState(false);
 
   const categoryOptions = useMemo(
     () => [
@@ -1049,6 +1152,13 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
     ? threadForm.category
     : defaultCategory;
 
+  const retryForumLoad = useCallback(() => {
+    setFeedback('');
+    setServiceNotice(null);
+    setLoadingForum(true);
+    setForumReloadKey((current) => current + 1);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -1062,6 +1172,7 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
         const nextThreads = sortThreads(
           (Array.isArray(threadsPayload?.data) ? threadsPayload.data : []).map((thread) => ({
             ...thread,
+            replies: Array.isArray(thread.replies) ? thread.replies : [],
             detailsLoaded: Array.isArray(thread.replies) && thread.replies.length > 0,
           })),
         );
@@ -1070,12 +1181,14 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
         setThreads(nextThreads);
         setSelectedThreadId((current) => current || nextThreads[0]?.id || '');
         setFeedback('');
+        setServiceNotice(null);
       })
       .catch((error) => {
         if (cancelled) return;
         setCategories([]);
         setThreads([]);
-        setFeedback(error.message || 'Unable to load forum discussions right now.');
+        setFeedback('');
+        setServiceNotice(createForumServiceNotice(error));
       })
       .finally(() => {
         if (!cancelled) {
@@ -1086,7 +1199,7 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [forumReloadKey]);
 
   const sortedThreads = useMemo(() => sortThreads(threads), [threads]);
   const filteredThreads = useMemo(() => {
@@ -1115,80 +1228,30 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
     });
   }, [activeCategory, categoryLabelByKey, searchQuery, sortedThreads]);
 
-  const selectedThread = useMemo(() => {
-    const visibleMatch = filteredThreads.find((thread) => thread.id === selectedThreadId);
-    if (visibleMatch) {
-      return visibleMatch;
-    }
-
-    return filteredThreads[0] || sortedThreads[0] || null;
-  }, [filteredThreads, selectedThreadId, sortedThreads]);
-
   const totalReplies = useMemo(
     () =>
       threads.reduce(
-        (sum, thread) => sum + (Number(thread.replyCount) || (Array.isArray(thread.replies) ? thread.replies.length : 0)),
+        (total, thread) =>
+          total + (Number(thread.replyCount) || (Array.isArray(thread.replies) ? thread.replies.length : 0)),
         0,
       ),
     [threads],
   );
 
-  const selectedThreadDetailId = selectedThread?.id || '';
-  const selectedThreadDetailsLoaded = Boolean(selectedThread?.detailsLoaded);
+  const pinnedThread = useMemo(
+    () => sortedThreads.find((thread) => thread.pinned) || sortedThreads[0] || null,
+    [sortedThreads],
+  );
 
-  useEffect(() => {
-    if (!selectedThreadDetailId || selectedThreadDetailsLoaded) {
-      return undefined;
-    }
-
-    let cancelled = false;
-    setLoadingThreadId(String(selectedThreadDetailId));
-
-    fetchApiJson(`${API_ENDPOINTS.forum.thread}?id=${encodeURIComponent(selectedThreadDetailId)}&trackView=0`)
-      .then((payload) => {
-        if (cancelled) return;
-
-        const threadDetail = normalizeThreadDetail(payload);
-        if (!threadDetail.id) return;
-
-        setThreads((current) =>
-          sortThreads(
-            current.map((thread) =>
-              thread.id === threadDetail.id
-                ? {
-                    ...thread,
-                    ...threadDetail,
-                    views: Math.max(Number(thread.views) || 0, Number(threadDetail.views) || 0),
-                  }
-                : thread,
-            ),
-          ),
-        );
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setThreads((current) =>
-            current.map((thread) =>
-              thread.id === selectedThreadDetailId
-                ? {
-                    ...thread,
-                    detailsLoaded: true,
-                  }
-                : thread,
-            ),
-          );
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setLoadingThreadId('');
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedThreadDetailId, selectedThreadDetailsLoaded]);
+  const forumStats = useMemo(
+    () => [
+      { label: 'Topics', value: categories.length },
+      { label: 'Threads', value: threads.length },
+      { label: 'Replies', value: totalReplies },
+      { label: 'Online now', value: loadingForum ? 'Checking' : 'Live', online: true },
+    ],
+    [categories.length, loadingForum, threads.length, totalReplies],
+  );
 
   const updateThreadForm = (field, value) => {
     setThreadForm((current) => ({ ...current, [field]: value }));
@@ -1223,15 +1286,28 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
       const nextThread = payload?.data;
 
       if (nextThread) {
-        setThreads((current) => sortThreads([{ ...nextThread, detailsLoaded: true }, ...current]));
+        setThreads((current) =>
+          sortThreads([
+            {
+              ...nextThread,
+              replies: Array.isArray(nextThread.replies) ? nextThread.replies : [],
+              detailsLoaded: true,
+            },
+            ...current,
+          ]),
+        );
         setSelectedThreadId(nextThread.id);
       }
 
       setThreadForm({ ...THREAD_FORM, category });
       setActiveCategory('all');
       setFeedback(payload.message || 'Discussion posted.');
+      setServiceNotice(null);
     } catch (error) {
       setFeedback(error.message || 'Unable to post discussion right now.');
+      if (isForumServiceIssue(error)) {
+        setServiceNotice(createForumServiceNotice(error));
+      }
     } finally {
       setSubmittingThread(false);
     }
@@ -1256,151 +1332,151 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
     });
   };
 
-  const handleReply = async (event) => {
-    event.preventDefault();
-
-    if (!isAuthenticated) {
-      onRequireAuth();
-      return;
-    }
-
-    const body = replyForm.body.trim();
-
-    if (!body || !selectedThread) {
-      setFeedback('Please enter a reply first.');
-      return;
-    }
-
-    setSubmittingReply(true);
-    setFeedback('');
-
-    try {
-      const payload = await postJson(API_ENDPOINTS.forum.posts, {
-        threadId: selectedThread.id,
-        body,
-      });
-      const nextReply = payload?.data;
-
-      if (nextReply) {
-        setThreads((current) =>
-          sortThreads(
-            current.map((thread) =>
-              thread.id === selectedThread.id
-                ? {
-                    ...thread,
-                    replies: [...(thread.replies || []), nextReply],
-                    detailsLoaded: true,
-                    replyCount: (Number(thread.replyCount) || (thread.replies || []).length) + 1,
-                    lastReplyAt: nextReply.createdAt,
-                  }
-                : thread,
-            ),
-          ),
-        );
-      }
-
-      setReplyForm(REPLY_FORM);
-      setFeedback(payload.message || 'Reply added.');
-    } catch (error) {
-      setFeedback(error.message || 'Unable to add reply right now.');
-    } finally {
-      setSubmittingReply(false);
-    }
-  };
-
-  const topicLabel = (thread) => thread?.categoryName || categoryLabelByKey.get(thread?.category) || thread?.category || 'Topic';
-
   return (
     <section className="forum-page" aria-labelledby="forum-title">
-      <header className="page-header">
-        <div>
-          <span className="page-kicker">Public Community</span>
-          <h1 id="forum-title">Forum</h1>
-        </div>
-        <div className="page-stats" aria-label="Forum summary">
-          <span>
-            <MessageSquare size={17} />
-            {threads.length} discussions
-          </span>
-          <span>
-            <Users size={17} />
-            {totalReplies} replies
-          </span>
-        </div>
-      </header>
+      <h1 id="forum-title" className="sr-only">Forum</h1>
+
+      {serviceNotice ? (
+        <ForumServiceNotice isRetrying={loadingForum} notice={serviceNotice} onRetry={retryForumLoad} />
+      ) : null}
 
       <div className="forum-workspace">
-        <aside className="forum-sidebar" aria-label="Forum tools">
-          {isAuthenticated ? (
-            <form className="tool-panel forum-composer" onSubmit={handleCreateThread}>
-              <div className="panel-title">
-                <Plus size={18} />
-                <span>New Discussion</span>
+        <section className="feed" aria-label="Forum discussions">
+          <button
+            className="pinned-strip"
+            type="button"
+            onClick={() => {
+              if (pinnedThread) {
+                handleSelectThread(pinnedThread.id);
+              }
+            }}
+          >
+            <Pin size={16} aria-hidden="true" />
+            <span className="pinned-text">
+              <strong>{pinnedThread?.title || 'Welcome to the member forum'}</strong>
+              <span>
+                {pinnedThread?.body ||
+                  'Read the community rules, search before posting, and keep every chapter conversation respectful.'}
+              </span>
+            </span>
+          </button>
+
+          <div className="thread-list feed-list" aria-label="Discussion list">
+            {loadingForum && filteredThreads.length === 0 ? (
+              Array.from({ length: 4 }, (_, index) => <ForumPostSkeleton key={`forum-post-skeleton-${index}`} />)
+            ) : filteredThreads.length > 0 ? (
+              filteredThreads.map((thread) => (
+                <ThreadListItem
+                  isSelected={String(selectedThreadId) === String(thread.id)}
+                  key={thread.id}
+                  onSelect={() => handleSelectThread(thread.id)}
+                  thread={thread}
+                />
+              ))
+            ) : (
+              <EmptyState
+                icon={MessageSquare}
+                title={
+                  loadingForum
+                    ? 'Loading discussions...'
+                    : serviceNotice
+                      ? 'Forum temporarily unavailable.'
+                      : 'No discussions found.'
+                }
+                text={
+                  loadingForum
+                    ? 'Please wait while the forum loads.'
+                    : serviceNotice
+                      ? 'Use Retry above to check if the API/server is back online.'
+                      : 'Try another topic or search term.'
+                }
+              />
+            )}
+          </div>
+
+          <div className="load-more" role={loadingForum ? 'status' : undefined}>
+            {loadingForum ? (
+              <>
+                <span className="load-spinner" aria-hidden="true" />
+                <span>Loading more posts...</span>
+              </>
+            ) : (
+              <span>{filteredThreads.length > 0 ? "You've reached the end." : 'Waiting for discussions.'}</span>
+            )}
+          </div>
+        </section>
+
+        <aside className="forum-sidebar sidebar" aria-label="Forum tools">
+          {loadingForum ? (
+            <ForumComposerSkeleton />
+          ) : isAuthenticated ? (
+            <form className="s-card forum-composer" onSubmit={handleCreateThread}>
+              <div className="s-header">
+                <UserRound size={15} aria-hidden="true" />
+                <span className="s-title">Create post</span>
               </div>
 
-              <label htmlFor="thread-title">
-                <span>Title</span>
-                <input
-                  id="thread-title"
-                  type="text"
-                  value={threadForm.title}
-                  onChange={(event) => updateThreadForm('title', event.target.value)}
-                  placeholder="Post title"
-                />
-              </label>
+              <div className="composer-body">
+                <div className="composer-identity">
+                  <div className="composer-avatar">{member.initials}</div>
+                  <div>
+                    <strong>{member.name}</strong>
+                    <span>Start a discussion</span>
+                  </div>
+                </div>
 
-              <label htmlFor="thread-category">
-                <span>Topic</span>
-                <select
-                  id="thread-category"
-                  value={selectedCategory}
-                  onChange={(event) => updateThreadForm('category', event.target.value)}
-                  disabled={categories.length === 0}
-                >
-                  {categories.map((category) => (
-                    <option key={category.slug} value={category.slug}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <label htmlFor="thread-title">
+                  <span>Title</span>
+                  <input
+                    id="thread-title"
+                    type="text"
+                    value={threadForm.title}
+                    onChange={(event) => updateThreadForm('title', event.target.value)}
+                    placeholder="Post title"
+                  />
+                </label>
 
-              <label htmlFor="thread-body">
-                <span>Message</span>
-                <textarea
-                  id="thread-body"
-                  value={threadForm.body}
-                  onChange={(event) => updateThreadForm('body', event.target.value)}
-                  placeholder="Start the conversation"
-                  rows={5}
-                />
-              </label>
+                <label htmlFor="thread-category">
+                  <span>Topic</span>
+                  <select
+                    id="thread-category"
+                    value={selectedCategory}
+                    onChange={(event) => updateThreadForm('category', event.target.value)}
+                    disabled={categories.length === 0}
+                  >
+                    {categories.map((category) => (
+                      <option key={category.slug} value={category.slug}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-              <button type="submit" disabled={submittingThread || categories.length === 0}>
-                <Send size={17} />
-                <span>{submittingThread ? 'Posting...' : 'Post Discussion'}</span>
-              </button>
+                <label htmlFor="thread-body">
+                  <span>Message</span>
+                  <textarea
+                    id="thread-body"
+                    value={threadForm.body}
+                    onChange={(event) => updateThreadForm('body', event.target.value)}
+                    placeholder="Start the conversation"
+                    rows={5}
+                  />
+                </label>
 
-              {feedback ? <div className="forum-feedback">{feedback}</div> : null}
+                <button type="submit" disabled={submittingThread || categories.length === 0}>
+                  <Send size={16} />
+                  <span>{submittingThread ? 'Posting...' : 'Post Discussion'}</span>
+                </button>
+
+                {feedback ? <div className="forum-feedback">{feedback}</div> : null}
+              </div>
             </form>
-          ) : (
-            <div className="tool-panel guest-panel">
-              <div className="panel-title">
-                <Plus size={18} />
-                <span>Join the discussion</span>
-              </div>
-              <p>Visitors can read all topics. Sign in or create an account to post and reply.</p>
-              <button type="button" onClick={onRequireAuth}>
-                <LogIn size={17} />
-                <span>Sign in to post</span>
-              </button>
-            </div>
-          )}
+          ) : null}
 
-          <div className="tool-panel">
-            <div className="panel-title">
-              <Tag size={18} />
-              <span>Topics</span>
+          <div className="s-card topic-panel">
+            <div className="s-header">
+              <Tag size={15} aria-hidden="true" />
+              <span className="s-title">Topics</span>
             </div>
             <div className="category-list">
               {categoryOptions.map((category) => (
@@ -1410,149 +1486,215 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
                   type="button"
                   onClick={() => setActiveCategory(category.key)}
                 >
-                  {category.label}
+                  <span className="category-mark">{category.key === 'all' ? '#' : category.label[0]}</span>
+                  <span>{category.label}</span>
                 </button>
               ))}
             </div>
           </div>
-        </aside>
 
-        <section className="forum-main" aria-label="Forum discussions">
-          <div className="forum-layout">
-            <div className="thread-list" aria-label="Discussion list">
-              {filteredThreads.length > 0 ? (
-                filteredThreads.map((thread) => (
-                  <ThreadListItem
-                    isSelected={selectedThread?.id === thread.id}
-                    key={thread.id}
-                    onSelect={() => handleSelectThread(thread.id)}
-                    thread={thread}
-                  />
-                ))
-              ) : (
-                <EmptyState
-                  icon={MessageSquare}
-                  title={loadingForum ? 'Loading discussions...' : 'No discussions found.'}
-                  text={loadingForum ? 'Please wait while the forum loads.' : 'Try another topic or search term.'}
-                />
-              )}
+          <div className="s-card rules-card">
+            <div className="s-header">
+              <CheckCircle2 size={15} aria-hidden="true" />
+              <span className="s-title">Community rules</span>
             </div>
-
-            <article className="thread-detail" aria-label="Selected discussion">
-              {selectedThread ? (
-                <>
-                  <div className="thread-detail-head">
-                    <span className="topic-pill">{topicLabel(selectedThread)}</span>
-                    <h2>{selectedThread.title}</h2>
-                    <div className="thread-detail-meta">
-                      <AuthorLabel name={selectedThread.author} username={selectedThread.authorUsername} />
-                      <span>{formatForumDate(selectedThread.createdAt)}</span>
-                    </div>
-                  </div>
-
-                  <p className="thread-detail-body">{selectedThread.body}</p>
-
-                  <div className="action-row">
-                    <span>
-                      <Eye size={17} />
-                      {selectedThread.views} views
-                    </span>
-                    <span>
-                      <MessageSquare size={17} />
-                      {Number(selectedThread.replyCount) || selectedThread.replies.length} replies
-                    </span>
-                  </div>
-
-                  <div className="reply-list">
-                    <h3>Replies</h3>
-                    {loadingThreadId === String(selectedThread.id) ? (
-                      <p className="no-replies">Loading replies...</p>
-                    ) : selectedThread.replies.length > 0 ? (
-                      selectedThread.replies.map((reply) => (
-                        <div className="reply-item" key={reply.id}>
-                          <div className="reply-avatar">{getMemberInitials(reply.author)}</div>
-                          <div>
-                            <div className="reply-meta">
-                              <AuthorLabel name={reply.author} username={reply.authorUsername} />
-                              <span>{formatForumDate(reply.createdAt)}</span>
-                            </div>
-                            <p>{reply.body}</p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="no-replies">No replies yet.</p>
-                    )}
-                  </div>
-
-                  <form className="reply-form" onSubmit={handleReply}>
-                    {isAuthenticated ? (
-                      <>
-                        <label htmlFor="reply-body">
-                          <span>Reply as {member.name}</span>
-                          <textarea
-                            id="reply-body"
-                            rows={4}
-                            value={replyForm.body}
-                            onChange={(event) => setReplyForm({ body: event.target.value })}
-                            placeholder="Write a reply"
-                          />
-                        </label>
-                        <button type="submit" disabled={submittingReply}>
-                          <Send size={17} />
-                          <span>{submittingReply ? 'Sending...' : 'Send Reply'}</span>
-                        </button>
-                      </>
-                    ) : (
-                      <div className="reply-signin">
-                        <strong>Want to reply?</strong>
-                        <button type="button" onClick={onRequireAuth}>
-                          Sign in
-                        </button>
-                      </div>
-                    )}
-                  </form>
-                </>
-              ) : (
-                <EmptyState
-                  icon={MessageSquare}
-                  title={loadingForum ? 'Loading forum.' : 'Select a discussion.'}
-                  text={loadingForum ? 'The database-backed forum is loading.' : 'Choose a topic from the list.'}
-                />
-              )}
-            </article>
+            <div className="rules-list">
+              {[
+                'Be respectful to all members.',
+                'No spam or self-promotion.',
+                'Search before posting.',
+                'Use the correct category.',
+                "Report issues; don't escalate them.",
+              ].map((rule, index) => (
+                <div className="rule-row" key={rule}>
+                  <span className="rule-num">{index + 1}</span>
+                  <span className="rule-text">{rule}</span>
+                </div>
+              ))}
+            </div>
+            {!isAuthenticated ? (
+              <div className="join-banner">
+                <p>Join the member discussion and create your first post.</p>
+                <button className="join-now-btn" type="button" onClick={onRequireAuth}>
+                  <UserPlus size={15} />
+                  <span>Join us now</span>
+                </button>
+              </div>
+            ) : null}
           </div>
-        </section>
+
+          <div className="s-card">
+            <div className="s-header">
+              <MessageSquare size={15} aria-hidden="true" />
+              <span className="s-title">Forum stats</span>
+            </div>
+            <div className="stats-list">
+              {forumStats.map((stat) => (
+                <div className="stat-row" key={stat.label}>
+                  <span className="stat-label">
+                    {stat.online ? <span className="online-dot" aria-hidden="true" /> : null}
+                    {stat.label}
+                  </span>
+                  <span className={`stat-val ${stat.online ? 'online' : ''}`}>
+                    {typeof stat.value === 'number' ? formatCompactNumber(stat.value) : stat.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
       </div>
     </section>
   );
 }
 
-function ThreadListItem({ isSelected, onSelect, thread }) {
+function ForumServiceNotice({ isRetrying, notice, onRetry }) {
   return (
-    <button className={`thread-item ${isSelected ? 'active' : ''}`} type="button" onClick={onSelect}>
-      <div className="thread-topline">
-        <span className="topic-pill">{thread.categoryName || thread.category}</span>
-        {thread.pinned ? (
-          <span className="pinned-label">
-            <Pin size={14} />
-            Pinned
+    <div className="forum-service-notice" role="alert" aria-live="assertive">
+      <span className="forum-service-notice-icon" aria-hidden="true">
+        <CircleAlert size={22} strokeWidth={2.4} />
+      </span>
+      <div className="forum-service-notice-copy">
+        <strong>{notice.title}</strong>
+        <p>{notice.message}</p>
+      </div>
+      <button type="button" onClick={onRetry} disabled={isRetrying}>
+        <RefreshCw size={16} />
+        <span>{isRetrying ? 'Checking...' : 'Retry'}</span>
+      </button>
+    </div>
+  );
+}
+
+function ForumPostSkeleton() {
+  return (
+    <div className="post-card thread-item forum-post-skeleton" aria-hidden="true">
+      <span className="post-body">
+        <span className="post-top">
+          <Skeleton animation="wave" variant="rounded" width={68} height={18} />
+          <Skeleton animation="wave" variant="text" width={116} sx={{ fontSize: '0.72rem' }} />
+          <Skeleton animation="wave" variant="text" width={58} sx={{ fontSize: '0.72rem' }} />
+        </span>
+        <span className="post-content-line">
+          <span className="post-copy">
+            <Skeleton animation="wave" variant="text" width="74%" sx={{ fontSize: '1rem' }} />
+            <Skeleton animation="wave" variant="text" width="94%" sx={{ fontSize: '0.82rem' }} />
+            <Skeleton animation="wave" variant="text" width="58%" sx={{ fontSize: '0.82rem' }} />
           </span>
-        ) : null}
-      </div>
-      <strong>{thread.title}</strong>
-      <p>{thread.body}</p>
-      <div className="thread-meta">
-        <AuthorLabel name={thread.author} username={thread.authorUsername} />
-        <span>
-          <Clock size={14} />
-          {formatForumDate(getLatestActivityTime(thread))}
+          <Skeleton animation="wave" className="post-thumb-skeleton" variant="rounded" width={80} height={56} />
         </span>
-        <span>
-          <MessageSquare size={14} />
-          {Number(thread.replyCount) || thread.replies.length}
+        <span className="post-actions">
+          <Skeleton animation="wave" variant="rounded" width={92} height={24} />
+          <Skeleton animation="wave" variant="rounded" width={72} height={24} />
+          <Skeleton animation="wave" variant="rounded" width={82} height={24} />
+          <Skeleton animation="wave" variant="rounded" width={62} height={24} />
+          <Skeleton animation="wave" variant="rounded" width={68} height={24} />
         </span>
+      </span>
+    </div>
+  );
+}
+
+function ForumComposerSkeleton() {
+  return (
+    <div className="s-card forum-composer forum-composer-skeleton" aria-hidden="true">
+      <div className="s-header">
+        <Skeleton animation="wave" variant="circular" width={15} height={15} />
+        <Skeleton animation="wave" variant="text" width="44%" sx={{ fontSize: '0.76rem' }} />
       </div>
+      <div className="composer-body">
+        <div className="composer-identity">
+          <Skeleton animation="wave" variant="circular" width={34} height={34} />
+          <div className="composer-skeleton-copy">
+            <Skeleton animation="wave" variant="text" width={112} sx={{ fontSize: '0.82rem' }} />
+            <Skeleton animation="wave" variant="text" width={84} sx={{ fontSize: '0.69rem' }} />
+          </div>
+        </div>
+        <Skeleton animation="wave" variant="rounded" width="100%" height={34} />
+        <Skeleton animation="wave" variant="rounded" width="100%" height={34} />
+        <Skeleton animation="wave" variant="rounded" width="100%" height={92} />
+        <Skeleton animation="wave" variant="rounded" width="100%" height={32} />
+      </div>
+    </div>
+  );
+}
+
+function ForumSidebarSkeleton({ rows, titleWidth }) {
+  return (
+    <div className="s-card forum-sidebar-skeleton" aria-hidden="true">
+      <div className="s-header">
+        <Skeleton animation="wave" variant="circular" width={15} height={15} />
+        <Skeleton animation="wave" variant="text" width={titleWidth} sx={{ fontSize: '0.76rem' }} />
+      </div>
+      <div className="rules-list">
+        {Array.from({ length: rows }, (_, index) => (
+          <div className="rule-row" key={`sidebar-skeleton-${index}`}>
+            <Skeleton animation="wave" variant="circular" width={18} height={18} />
+            <Skeleton animation="wave" variant="text" width={`${86 - index * 8}%`} sx={{ fontSize: '0.72rem' }} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ThreadListItem({ isSelected, onSelect, thread }) {
+  const replyCount = Number(thread.replyCount) || (Array.isArray(thread.replies) ? thread.replies.length : 0);
+  const likeCount = Number(thread.approveCount) || 0;
+  const dislikeCount = Number(thread.disapproveCount) || 0;
+  const topicLabel = thread.categoryName || thread.category || 'General';
+
+  return (
+    <button className={`post-card thread-item ${isSelected ? 'active' : ''}`} type="button" onClick={onSelect}>
+      <span className="post-body">
+        <span className="post-top">
+          <span className={`post-tag ${getThreadTagClass(thread)}`}>{topicLabel}</span>
+          <span className="post-author">
+            by <AuthorLabel name={thread.author} username={thread.authorUsername} />
+          </span>
+          <span className="post-dot" aria-hidden="true">
+            -
+          </span>
+          <span className="post-time">{formatForumDate(getLatestActivityTime(thread))}</span>
+          {thread.pinned ? (
+            <span className="pinned-label">
+              <Pin size={13} />
+              Pinned
+            </span>
+          ) : null}
+        </span>
+        <span className="post-content-line">
+          <span className="post-copy">
+            <strong className="post-title">{thread.title}</strong>
+            <span className="post-preview">{thread.body}</span>
+          </span>
+          <span className="post-thumb" aria-hidden="true">
+            {thread.pinned ? <Pin size={21} /> : <MessageSquare size={21} />}
+          </span>
+        </span>
+        <span className="post-actions">
+          <span className="action-btn like-action">
+            <ThumbsUp size={13} />
+            Like {formatCompactNumber(likeCount)}
+          </span>
+          <span className="action-btn dislike-action">
+            <ThumbsDown size={13} />
+            Dislike {formatCompactNumber(dislikeCount)}
+          </span>
+          <span className="action-btn">
+            <MessageSquare size={13} />
+            {formatCompactNumber(replyCount)} comments
+          </span>
+          <span className="action-btn">
+            <Eye size={13} />
+            {formatCompactNumber(Number(thread.views) || 0)}
+          </span>
+          <span className="action-btn">
+            <Clock size={13} />
+            Latest
+          </span>
+        </span>
+      </span>
     </button>
   );
 }
