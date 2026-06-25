@@ -3,9 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { openForumApp } from '../lib/forumAppUrl';
 
 const navItems = [
-  { path: '/membership/application', label: 'ID Application' },
   { path: '/clubs', label: 'Regional Clubs' },
-  { path: '/forum', label: 'Forum', forumPath: '/forum' },
 ];
 const OFFICERS_DROPDOWN_ITEMS = [
   { path: '/officers/national', label: 'National Officers' },

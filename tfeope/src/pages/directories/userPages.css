@@ -183,6 +183,7 @@
 
 .user-directory-tools {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 0.8rem;
   padding: 1rem 2rem;
