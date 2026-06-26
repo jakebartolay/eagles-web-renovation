@@ -107,6 +107,20 @@ export const buildRegionalClubGroupsFromApi = (governorRows = [], clubRows = [],
   const groupsByRegion = new Map();
   const governorById = new Map();
   const regionById = new Map();
+  const catalogedRegionKeysByClubKey = new Map();
+  const unassignedRegionKey = normalizeTextKey('Unassigned Region');
+
+  const rememberCatalogedClubRegion = (club, regionName) => {
+    const clubKey = normalizeTextKey(club?.name);
+    const regionKey = normalizeTextKey(regionName);
+    if (!clubKey || !regionKey || regionKey === unassignedRegionKey) return;
+
+    if (!catalogedRegionKeysByClubKey.has(clubKey)) {
+      catalogedRegionKeysByClubKey.set(clubKey, new Set());
+    }
+
+    catalogedRegionKeysByClubKey.get(clubKey).add(regionKey);
+  };
 
   const ensureGroup = ({ region, governorName = '', governorSlug = '', governorId = null, location = 'ph' }) => {
     const regionName = region || 'Unassigned Region';
@@ -178,6 +192,7 @@ export const buildRegionalClubGroupsFromApi = (governorRows = [], clubRows = [],
         ) {
           group.clubs.push(normalizedClub);
         }
+        rememberCatalogedClubRegion(normalizedClub, group.region);
       });
     });
   });
@@ -213,6 +228,7 @@ export const buildRegionalClubGroupsFromApi = (governorRows = [], clubRows = [],
     ) {
       group.clubs.push(normalizedClub);
     }
+    rememberCatalogedClubRegion(normalizedClub, group.region);
   });
 
   normalizedMembers.forEach((member) => {
@@ -224,6 +240,12 @@ export const buildRegionalClubGroupsFromApi = (governorRows = [], clubRows = [],
       region: regionName,
       location: isInternationalRegion(regionName) ? 'intl' : 'ph',
     });
+    const clubKey = normalizeTextKey(clubName);
+    const catalogedRegionKeys = catalogedRegionKeysByClubKey.get(clubKey);
+    if (catalogedRegionKeys?.size && !catalogedRegionKeys.has(normalizeTextKey(group.region))) {
+      return;
+    }
+
     const existingClub = group.clubs.find((item) => normalizeTextKey(item.name) === normalizeTextKey(clubName));
     if (existingClub) {
       existingClub.memberCount = Math.max(existingClub.memberCount || 0, countMembersForClub(normalizedMembers, clubName));
