@@ -4,7 +4,9 @@ const NAVIGATE_EVENT = 'app:navigate';
 
 const normalizePath = (path) => {
   if (!path) return '/';
-  return path.startsWith('/') ? path : `/${path}`;
+  const pathname = String(path).split(/[?#]/, 1)[0] || '/';
+  const absolutePathname = pathname.startsWith('/') ? pathname : `/${pathname}`;
+  return absolutePathname === '/' ? '/' : absolutePathname.replace(/\/+$/, '');
 };
 
 const scrollPageToTop = () => {
