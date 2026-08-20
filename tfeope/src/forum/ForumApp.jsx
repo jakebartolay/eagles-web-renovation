@@ -436,35 +436,24 @@ function ForumApplication() {
       '/signup': 'Create Account',
     };
 
-    document.title = `TFOE-PE Member Forum | ${titleByRoute[route] || 'Forum'}`;
-  }, [route]);
+    const pageTitle = !isAuthenticated && route !== '/signup' ? 'Sign In' : titleByRoute[route] || 'Forum';
+    document.title = `TFOE-PE Member Forum | ${pageTitle}`;
+  }, [isAuthenticated, route]);
 
   let page;
-  let authModal = null;
-  const authModalRoute = !isAuthenticated
-    ? route === '/login' || route === '/signup'
-      ? route
-      : ['/profile', '/settings'].includes(route)
-        ? '/login'
-        : ''
-    : '';
-  const contentRoute = authModalRoute ? '/' : route;
+  const guestRoute = route === '/signup' ? '/signup' : '/login';
+  const contentRoute = route === '/login' || route === '/signup' ? '/' : route;
 
   if (authState.status === 'loading') {
     page = <LoadingScreen />;
-  } else {
-    if (authModalRoute) {
-      authModal = (
-        <AuthModal onClose={() => navigate('/')}>
-          {authModalRoute === '/login' ? (
-            <LoginPage onLogin={handleLogin} onNavigate={navigate} onNotify={showToast} />
-          ) : (
-            <SignupPage onNavigate={navigate} onNotify={showToast} onSignup={handleSignup} />
-          )}
-        </AuthModal>
+  } else if (!isAuthenticated) {
+    page =
+      guestRoute === '/signup' ? (
+        <SignupPage onNavigate={navigate} onNotify={showToast} onSignup={handleSignup} />
+      ) : (
+        <LoginPage onLogin={handleLogin} onNavigate={navigate} onNotify={showToast} />
       );
-    }
-
+  } else {
     page = (
       <MemberShell
         activeRoute={contentRoute}
@@ -502,7 +491,6 @@ function ForumApplication() {
   return (
     <>
       {page}
-      {authModal}
       <ToastNotification toast={toast} onDismiss={dismissToast} />
     </>
   );
@@ -717,9 +705,6 @@ function LoginPage({ onLogin, onNavigate, onNotify }) {
           </button>
         </p>
 
-        <button className="auth-secondary-action" type="button" onClick={() => onNavigate('/')}>
-          Continue as visitor
-        </button>
       </form>
     </AuthScreen>
   );
@@ -834,9 +819,6 @@ function SignupPage({ onNavigate, onNotify, onSignup }) {
           </button>
         </p>
 
-        <button className="auth-secondary-action" type="button" onClick={() => onNavigate('/')}>
-          Browse forum first
-        </button>
       </form>
     </AuthScreen>
   );
@@ -886,53 +868,6 @@ function AuthScreen({ eyebrow, title, subtitle, children, onNavigate }) {
         <div className="auth-form-panel">{children}</div>
       </div>
     </section>
-  );
-}
-
-function AuthModal({ children, onClose }) {
-  useEffect(() => {
-    const scrollY = window.scrollY;
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousBodyPosition = document.body.style.position;
-    const previousBodyTop = document.body.style.top;
-    const previousBodyWidth = document.body.style.width;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.top = `-${scrollY}px`;
-    document.body.style.width = '100%';
-    document.documentElement.style.overflow = 'hidden';
-
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.body.style.position = previousBodyPosition;
-      document.body.style.top = previousBodyTop;
-      document.body.style.width = previousBodyWidth;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-      window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [onClose]);
-
-  return (
-    <div className="auth-modal" role="presentation">
-      <button className="auth-modal-backdrop" type="button" onClick={onClose} aria-label="Close member access" />
-      <div className="auth-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
-        <button className="auth-modal-close" type="button" onClick={onClose} aria-label="Close member access">
-          <X size={20} />
-        </button>
-        {children}
-      </div>
-    </div>
   );
 }
 
