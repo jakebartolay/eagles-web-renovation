@@ -6,7 +6,6 @@ import {
   Eye,
   EyeOff,
   IdCard,
-  Lock,
   LogIn,
   LogOut,
   MessageSquare,
@@ -29,8 +28,7 @@ import { API_ENDPOINTS, fetchApiJson, postJson } from './api';
 import forumStylesUrl from './styles.css?url';
 
 const ROUTE_EVENT = 'app:navigate';
-const LOCAL_BASE_PATHS = ['/tfeope-forum', '/forum'];
-const ADMIN_ROLE_IDS = new Set([1, 2]);
+const LOCAL_BASE_PATHS = ['/forum', '/tfeope-forum'];
 const FORUM_STYLESHEET_ID = 'tfeope-forum-styles';
 
 const LOGIN_FORM = {
@@ -454,8 +452,6 @@ function ForumApplication() {
 
   if (authState.status === 'loading') {
     page = <LoadingScreen />;
-  } else if (isAuthenticated && ADMIN_ROLE_IDS.has(Number(session?.roleId || session?.role_id || 0))) {
-    page = <AccessNotice onLogout={handleLogout} />;
   } else {
     if (authModalRoute) {
       authModal = (
@@ -494,6 +490,7 @@ function ForumApplication() {
           <ForumPage
             isAuthenticated={isAuthenticated}
             member={member}
+            onNavigate={navigate}
             onRequireAuth={() => navigate('/signup')}
             searchQuery={forumSearchQuery}
           />
@@ -939,23 +936,6 @@ function AuthModal({ children, onClose }) {
   );
 }
 
-function AccessNotice({ onLogout }) {
-  return (
-    <section className="auth-screen">
-      <div className="auth-card auth-card-small">
-        <div className="access-notice">
-          <Lock size={32} />
-          <strong>Admin account detected</strong>
-          <p>This member forum is for member accounts.</p>
-          <button type="button" onClick={onLogout}>
-            Logout
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
 function MemberShell({
   activeRoute,
   children,
@@ -1047,15 +1027,6 @@ function MemberShell({
             >
               <MessageSquare size={17} />
               <span>Feed</span>
-            </button>
-
-            <button
-              className={isChangelogsRoute ? 'active' : ''}
-              type="button"
-              onClick={() => onNavigate('/changelogs')}
-            >
-              <Settings size={17} />
-              <span>Updates</span>
             </button>
           </nav>
         ) : null}
@@ -1183,7 +1154,7 @@ function ChangelogsPage({ onNavigate }) {
   );
 }
 
-function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
+function ForumPage({ isAuthenticated, member, onNavigate, onRequireAuth, searchQuery }) {
   const [categories, setCategories] = useState([]);
   const [threads, setThreads] = useState([]);
   const [activeCategory, setActiveCategory] = useState('all');
@@ -1566,6 +1537,22 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
                 </button>
               </div>
             ) : null}
+          </div>
+
+          <div className="s-card updates-card">
+            <div className="s-header">
+              <Clock size={15} aria-hidden="true" />
+              <span className="s-title">Updates</span>
+            </div>
+            <div className="updates-card-body">
+              <span>{CHANGELOG_ENTRIES[0]?.date || 'Recent'}</span>
+              <strong>{CHANGELOG_ENTRIES[0]?.title || 'System updates'}</strong>
+              <p>{CHANGELOG_ENTRIES[0]?.summary || 'Latest forum improvements and fixes.'}</p>
+              <button type="button" onClick={() => onNavigate('/changelogs')}>
+                <Clock size={15} aria-hidden="true" />
+                <span>View updates</span>
+              </button>
+            </div>
           </div>
 
         </aside>

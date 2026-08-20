@@ -3,7 +3,7 @@ const getDefaultForumAppUrl = () => {
     return `${window.location.origin}/forum`;
   }
 
-  return '/tfeope-forum';
+  return '/forum';
 };
 
 const normalizeBaseUrl = (value) => String(value || getDefaultForumAppUrl()).replace(/\/+$/, '');

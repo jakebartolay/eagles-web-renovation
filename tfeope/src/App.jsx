@@ -43,6 +43,11 @@ function ForumRedirectPage({ to = '/forum' }) {
   );
 }
 
+function LegacyForumRedirectPage({ currentPath = '/tfeope-forum' }) {
+  const nextPath = currentPath.replace(/^\/tfeope-forum(?=\/|$)/, '/forum') || '/forum';
+  return <ForumRedirectPage to={nextPath} />;
+}
+
 const ROUTES = {
   '/': HomePage,
   '/history': HistoryPage,
@@ -68,6 +73,7 @@ const ROUTES = {
   '/news': NewsPage,
   '/events': EventsPage,
   '/forum': ForumApp,
+  '/tfeope-forum': LegacyForumRedirectPage,
   '/officers': () => <OfficersPage groupKey="national" />,
   '/officers/national': () => <OfficersPage groupKey="national" />,
   '/officers/governors': UserGovernorsPage,
@@ -117,7 +123,7 @@ const resolveRouteComponent = (path) => {
   if (ROUTES[path]) return ROUTES[path];
   if (path.startsWith('/forum/')) return ForumApp;
   if (path === '/tfeope-forum' || path.startsWith('/tfeope-forum/')) {
-    return ForumApp;
+    return LegacyForumRedirectPage;
   }
   if (path.startsWith('/users/governors/')) return UserGovernorProfilePage;
   if (path.startsWith('/users/clubs/')) return UserClubPage;

@@ -40,9 +40,7 @@ if (!$user || !password_verify($password, (string) ($user['password_hash'] ?? ''
 
 $roleId = (int) ($user['role_id'] ?? 0);
 
-if (in_array($roleId, [1, 2], true)) {
-    api_error('Admin accounts should sign in through the admin dashboard.', 403);
-}
+session_regenerate_id(true);
 
 $_SESSION['user_id'] = (int) ($user['id'] ?? 0);
 $_SESSION['user_name'] = (string) ($user['name'] ?? '');
