@@ -24,6 +24,22 @@ const toSafeNumber = (value) => {
 
 const formatStatNumber = (value) => new Intl.NumberFormat('en-PH').format(toSafeNumber(value));
 
+const normalizeStatText = (value) => String(value || '').trim().replace(/\s+/g, ' ').toUpperCase();
+
+const countUniqueMemberClubs = (members = []) => {
+  const unavailableClubNames = new Set(['N/A', 'NA', 'NONE', 'NOT AVAILABLE', 'UNASSIGNED']);
+  const clubs = new Set();
+
+  members.forEach((member) => {
+    const clubName = normalizeStatText(member?.club || member?.clubName || member?.club_name || member?.chapter);
+    if (clubName && !unavailableClubNames.has(clubName)) {
+      clubs.add(clubName);
+    }
+  });
+
+  return clubs.size;
+};
+
 const extractCount = (payload, preferredListKeys = []) => {
   if (Array.isArray(payload)) return payload.length;
 
@@ -98,10 +114,19 @@ export default function HomePage() {
     ]).then(([membersResult, eventsResult, clubsResult]) => {
       if (!isMounted) return;
 
+      const memberRows = membersResult.status === 'fulfilled' ? extractList(membersResult.value, ['members', 'member']) : [];
       const membersCount =
-        membersResult.status === 'fulfilled' ? extractCount(membersResult.value, ['members', 'member']) : 0;
+        membersResult.status === 'fulfilled'
+          ? memberRows.length || extractCount(membersResult.value, ['members', 'member'])
+          : 0;
       const eventsCount = eventsResult.status === 'fulfilled' ? extractCount(eventsResult.value, ['events']) : 0;
-      const clubsCount = clubsResult.status === 'fulfilled' ? extractCount(clubsResult.value, ['clubs']) : 0;
+      const activeClubsCount = countUniqueMemberClubs(memberRows);
+      const clubsCount =
+        activeClubsCount > 0
+          ? activeClubsCount
+          : clubsResult.status === 'fulfilled'
+            ? extractCount(clubsResult.value, ['clubs'])
+            : 0;
 
       setStats({
         members: membersCount > 0 ? membersCount : DEFAULT_STATS.members,
