@@ -1,3 +1,4 @@
 *.mp4
+tfeope-api/php-*.log
 tfeope-forum/node_modules/
 tfeope-forum/dist/

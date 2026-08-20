@@ -5,7 +5,6 @@ import Reveal from '../components/Reveal';
 import { PUBLIC_BRANDING } from '../config';
 import { API_ENDPOINTS, extractList, fetchJson, resolveImageFromItem } from '../config/api';
 
-const MEMBER_DISPLAY_CAP = 800;
 const COUNTER_DURATION_MS = 1300;
 const DEFAULT_STATS = {
   members: 500,
@@ -22,6 +21,8 @@ const toSafeNumber = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const formatStatNumber = (value) => new Intl.NumberFormat('en-PH').format(toSafeNumber(value));
 
 const extractCount = (payload, preferredListKeys = []) => {
   if (Array.isArray(payload)) return payload.length;
@@ -124,7 +125,7 @@ export default function HomePage() {
     const start = performance.now();
 
     const targets = {
-      members: Math.min(Math.max(toSafeNumber(stats.members), 0), MEMBER_DISPLAY_CAP),
+      members: Math.max(toSafeNumber(stats.members), 0),
       years: Math.max(toSafeNumber(stats.years), 0),
       events: Math.max(toSafeNumber(stats.events), 0),
       clubs: Math.max(toSafeNumber(stats.clubs), 0),
@@ -166,10 +167,10 @@ export default function HomePage() {
     };
   }, [activeHymnalVideo]);
 
-  const membersLabel = `${animatedStats.members}+`;
-  const yearsLabel = `${animatedStats.years}+`;
-  const eventsLabel = `${animatedStats.events}+`;
-  const clubsLabel = `${animatedStats.clubs}+`;
+  const membersLabel = `${formatStatNumber(animatedStats.members)}+`;
+  const yearsLabel = `${formatStatNumber(animatedStats.years)}+`;
+  const eventsLabel = `${formatStatNumber(animatedStats.events)}+`;
+  const clubsLabel = `${formatStatNumber(animatedStats.clubs)}+`;
   const hymnalVideos = useMemo(
     () => [
       {

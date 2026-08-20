@@ -1324,11 +1324,11 @@ if (!function_exists('api_current_admin')) {
         }
 
         $roleId = (int) ($user['role_id'] ?? 0);
-        if (!in_array($roleId, [1, 2], true)) {
+        if ($roleId !== 1) {
             return null;
         }
 
-        $user['role_label'] = $roleId === 1 ? 'Super Admin' : 'Admin';
+        $user['role_label'] = 'Super Admin';
 
         return $user;
     }
@@ -1341,7 +1341,7 @@ if (!function_exists('api_require_admin')) {
         if ($user === null) {
             api_json([
                 'ok' => false,
-                'message' => 'Unauthorized.',
+                'message' => 'Super Admin login required.',
                 'authenticated' => false,
             ], 401);
         }

@@ -442,19 +442,36 @@ function ForumApplication() {
   }, [route]);
 
   let page;
+  let authModal = null;
+  const authModalRoute = !isAuthenticated
+    ? route === '/login' || route === '/signup'
+      ? route
+      : ['/profile', '/settings'].includes(route)
+        ? '/login'
+        : ''
+    : '';
+  const contentRoute = authModalRoute ? '/' : route;
 
   if (authState.status === 'loading') {
     page = <LoadingScreen />;
   } else if (isAuthenticated && ADMIN_ROLE_IDS.has(Number(session?.roleId || session?.role_id || 0))) {
     page = <AccessNotice onLogout={handleLogout} />;
-  } else if (route === '/login' || (['/profile', '/settings'].includes(route) && !isAuthenticated)) {
-    page = <LoginPage onLogin={handleLogin} onNavigate={navigate} onNotify={showToast} />;
-  } else if (route === '/signup') {
-    page = <SignupPage onNavigate={navigate} onNotify={showToast} onSignup={handleSignup} />;
   } else {
+    if (authModalRoute) {
+      authModal = (
+        <AuthModal onClose={() => navigate('/')}>
+          {authModalRoute === '/login' ? (
+            <LoginPage onLogin={handleLogin} onNavigate={navigate} onNotify={showToast} />
+          ) : (
+            <SignupPage onNavigate={navigate} onNotify={showToast} onSignup={handleSignup} />
+          )}
+        </AuthModal>
+      );
+    }
+
     page = (
       <MemberShell
-        activeRoute={route}
+        activeRoute={contentRoute}
         isAuthenticated={isAuthenticated}
         member={member}
         onLogout={handleLogout}
@@ -462,22 +479,22 @@ function ForumApplication() {
         onSearchChange={setForumSearchQuery}
         searchQuery={forumSearchQuery}
       >
-        {route === '/profile' ? (
+        {contentRoute === '/profile' ? (
           <ProfilePage
             member={member}
             memberDetails={memberDetails}
             onLinkEaglesId={handleLinkEaglesId}
             session={session}
           />
-        ) : route === '/settings' ? (
+        ) : contentRoute === '/settings' ? (
           <SettingsPage member={member} onUpdateAccount={handleUpdateAccount} />
-        ) : route === '/changelogs' ? (
+        ) : contentRoute === '/changelogs' ? (
           <ChangelogsPage onNavigate={navigate} />
         ) : (
           <ForumPage
             isAuthenticated={isAuthenticated}
             member={member}
-            onRequireAuth={() => navigate('/login')}
+            onRequireAuth={() => navigate('/signup')}
             searchQuery={forumSearchQuery}
           />
         )}
@@ -488,6 +505,7 @@ function ForumApplication() {
   return (
     <>
       {page}
+      {authModal}
       <ToastNotification toast={toast} onDismiss={dismissToast} />
     </>
   );
@@ -874,6 +892,53 @@ function AuthScreen({ eyebrow, title, subtitle, children, onNavigate }) {
   );
 }
 
+function AuthModal({ children, onClose }) {
+  useEffect(() => {
+    const scrollY = window.scrollY;
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousBodyPosition = document.body.style.position;
+    const previousBodyTop = document.body.style.top;
+    const previousBodyWidth = document.body.style.width;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    document.documentElement.style.overflow = 'hidden';
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.body.style.position = previousBodyPosition;
+      document.body.style.top = previousBodyTop;
+      document.body.style.width = previousBodyWidth;
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' });
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="auth-modal" role="presentation">
+      <button className="auth-modal-backdrop" type="button" onClick={onClose} aria-label="Close member access" />
+      <div className="auth-modal-dialog" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+        <button className="auth-modal-close" type="button" onClick={onClose} aria-label="Close member access">
+          <X size={20} />
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 function AccessNotice({ onLogout }) {
   return (
     <section className="auth-screen">
@@ -1228,29 +1293,9 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
     });
   }, [activeCategory, categoryLabelByKey, searchQuery, sortedThreads]);
 
-  const totalReplies = useMemo(
-    () =>
-      threads.reduce(
-        (total, thread) =>
-          total + (Number(thread.replyCount) || (Array.isArray(thread.replies) ? thread.replies.length : 0)),
-        0,
-      ),
-    [threads],
-  );
-
   const pinnedThread = useMemo(
     () => sortedThreads.find((thread) => thread.pinned) || sortedThreads[0] || null,
     [sortedThreads],
-  );
-
-  const forumStats = useMemo(
-    () => [
-      { label: 'Topics', value: categories.length },
-      { label: 'Threads', value: threads.length },
-      { label: 'Replies', value: totalReplies },
-      { label: 'Online now', value: loadingForum ? 'Checking' : 'Live', online: true },
-    ],
-    [categories.length, loadingForum, threads.length, totalReplies],
   );
 
   const updateThreadForm = (field, value) => {
@@ -1523,25 +1568,6 @@ function ForumPage({ isAuthenticated, member, onRequireAuth, searchQuery }) {
             ) : null}
           </div>
 
-          <div className="s-card">
-            <div className="s-header">
-              <MessageSquare size={15} aria-hidden="true" />
-              <span className="s-title">Forum stats</span>
-            </div>
-            <div className="stats-list">
-              {forumStats.map((stat) => (
-                <div className="stat-row" key={stat.label}>
-                  <span className="stat-label">
-                    {stat.online ? <span className="online-dot" aria-hidden="true" /> : null}
-                    {stat.label}
-                  </span>
-                  <span className={`stat-val ${stat.online ? 'online' : ''}`}>
-                    {typeof stat.value === 'number' ? formatCompactNumber(stat.value) : stat.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
         </aside>
       </div>
     </section>

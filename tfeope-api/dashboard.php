@@ -1,9 +1,11 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
+require_once __DIR__ . '/admin-tool-auth.php';
 api_start();
 
 $db = api_db();
+$toolAdmin = api_tool_require_admin($db, 'TFEOPE API Dashboard');
 
 function get_dashboard_stats(PDO $db): array {
     return [
@@ -124,6 +126,7 @@ $endpoints = [
     'SYSTEM' => [
         ['GET', '/media.php?group={group}&file={file}', 'Serve stored media file'],
         ['GET', '/dashboard.php',                        'API dashboard page'],
+        ['GET', '/database-diagram/',                    'Database schema diagram'],
     ],
 ];
 
@@ -198,6 +201,16 @@ if (isset($_GET['ajax']) && $_GET['ajax'] === 'dashboard') {
     --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
     --shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
+    --api-sidebar-bg: rgba(17, 24, 39, 0.92);
+    --api-sidebar-border: var(--border);
+    --api-sidebar-text: var(--text-primary);
+    --api-sidebar-muted: var(--text-muted);
+    --api-sidebar-link: var(--text-secondary);
+    --api-sidebar-hover-bg: rgba(59, 130, 246, 0.08);
+    --api-sidebar-active-bg: var(--gradient-info);
+    --api-sidebar-active-border: rgba(59, 130, 246, 0.72);
+    --api-sidebar-shadow: var(--shadow-lg);
+    --api-sidebar-hint-bg: rgba(0, 0, 0, 0.18);
 }
 
 * { 
@@ -233,12 +246,14 @@ body::before {
 }
 
 .wrap { 
-    max-width: 1400px; 
+    max-width: 1680px; 
     margin: 0 auto; 
     padding: 32px 24px 60px;
     position: relative;
     z-index: 1;
 }
+
+<?= api_tool_sidebar_styles() ?>
 
 /* Header Styling */
 header { 
@@ -294,6 +309,23 @@ header p {
     border-color: var(--border-hover);
     transform: translateY(-2px);
     box-shadow: var(--shadow-md);
+}
+
+.tool-logout-button {
+    min-height: 44px;
+    padding: 0 18px;
+    border: 1px solid rgba(244, 63, 94, 0.35);
+    border-radius: 12px;
+    color: var(--accent-rose);
+    background: rgba(244, 63, 94, 0.10);
+    font-family: 'Sora', -apple-system, sans-serif;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.tool-logout-button:hover {
+    border-color: var(--accent-rose);
+    background: rgba(244, 63, 94, 0.16);
 }
 
 .pill-label { 
@@ -707,6 +739,9 @@ header p {
 </head>
 <body>
 <div class="wrap">
+<div class="api-tool-layout">
+<?= api_tool_sidebar('dashboard') ?>
+<main class="api-tool-main">
 
 <header>
     <div>
@@ -714,6 +749,10 @@ header p {
         <p>api.tfoepe-inc.com.ph &nbsp;|&nbsp; PHP <?= htmlspecialchars(phpversion()) ?></p>
     </div>
     <div class="top-right">
+        <div class="pill">
+            <div class="pill-label">Admin</div>
+            <div class="pill-value"><?= htmlspecialchars((string) ($toolAdmin['username'] ?? $toolAdmin['name'] ?? 'admin')) ?></div>
+        </div>
         <div class="pill">
             <div class="pill-label">Live status</div>
             <div class="pill-value"><span class="live-dot"></span>Auto-refresh 30s</div>
@@ -726,6 +765,7 @@ header p {
             <div class="pill-label">Last sync</div>
             <div class="pill-value" id="lastSync"><?= date('F j, Y g:i:s A') ?></div>
         </div>
+        <?= api_tool_logout_form('tool-logout-button', 'Sign out') ?>
     </div>
 </header>
 
@@ -860,6 +900,8 @@ header p {
     </div>
 </div>
 
+</div>
+</main>
 </div>
 
 <script>

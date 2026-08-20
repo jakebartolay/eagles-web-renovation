@@ -30,7 +30,7 @@ try {
     ', [':username' => $username]);
 
     $roleId = (int) ($user['role_id'] ?? 0);
-    $isValidRole = in_array($roleId, [1, 2], true);
+    $isValidRole = $roleId === 1;
     $passwordHash = (string) ($user['password_hash'] ?? '');
 
     if (
@@ -39,7 +39,7 @@ try {
         || $passwordHash === ''
         || !password_verify($password, $passwordHash)
     ) {
-        api_error('Invalid admin credentials.', 401);
+        api_error('Only Super Admin accounts can access the admin API.', 401);
     }
 
     session_regenerate_id(true);
