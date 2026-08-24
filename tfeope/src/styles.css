@@ -958,6 +958,12 @@ p {
   padding: 0 0 2rem;
 }
 
+.main-content.route-forum,
+.main-content.route-tfeope-forum {
+  min-height: 100svh;
+  padding-bottom: 0;
+}
+
 .main-content.route-members {
   min-height: 100svh;
   padding-bottom: 0;
@@ -6320,4 +6326,3 @@ p {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.6; }
 }
-
